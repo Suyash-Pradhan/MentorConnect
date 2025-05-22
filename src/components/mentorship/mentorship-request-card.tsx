@@ -41,10 +41,10 @@ interface MentorshipRequestCardProps {
 
 const getStatusBadgeVariant = (status: MentorshipRequest['status']) => {
   switch (status) {
-    case 'accepted': return 'default'; // Greenish or primary
+    case 'accepted': return 'default';
     case 'rejected': return 'destructive';
-    case 'pending': return 'secondary'; // Yellowish or muted
-    case 'messaged': return 'outline'; // Bluish or accent
+    case 'pending': return 'secondary';
+    case 'messaged': return 'outline';
     default: return 'secondary';
   }
 };
@@ -55,10 +55,10 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
   const [replyMessage, setReplyMessage] = React.useState("");
   const [isReplyDialogOpen, setIsReplyDialogOpen] = React.useState(false);
 
-  const targetUser = currentUserRole === 'student' ? 
-    { name: request.alumniName, avatar: request.alumniAvatar, role: 'Alumni' as const, id: request.alumniId } : 
+  const targetUser = currentUserRole === 'student' ?
+    { name: request.alumniName, avatar: request.alumniAvatar, role: 'Alumni' as const, id: request.alumniId } :
     { name: request.studentName, avatar: request.studentAvatar, role: 'Student' as const, id: request.studentId };
-  
+
   const initial = targetUser.name ? targetUser.name.charAt(0).toUpperCase() : targetUser.role.charAt(0);
 
   const handleAction = (status: 'accepted' | 'rejected') => {
@@ -66,6 +66,18 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
     toast({ title: `Request ${status}`, description: `Mentorship request has been ${status}.`});
   };
 
+  const handleSendMessage = () => {
+    if (!replyMessage.trim()) {
+      toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
+      return;
+    }
+    onUpdateRequestStatus(request.id, 'messaged', replyMessage);
+    toast({ title: "Message Sent", description: "Your message has been sent." });
+    setIsReplyDialogOpen(false); 
+    setReplyMessage(""); 
+  }; // Ensured semicolon
+
+  ; // Explicit semicolon before return
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-start gap-4 p-4 space-y-0">
@@ -79,7 +91,7 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
               <CardTitle className="text-lg">
                 <Link href={`/profile/${targetUser.id}`} className="hover:underline">
                   {targetUser.name}
-                </Link> 
+                </Link>
                 <span className="text-sm font-normal text-muted-foreground"> ({targetUser.role})</span>
               </CardTitle>
               <CardDescription className="text-xs">
@@ -136,30 +148,31 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
       )}
       { (request.status === 'accepted' || request.status === 'messaged') && (
          <CardFooter className="p-4 border-t flex justify-end gap-2">
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                    <Icons.send className="mr-2 h-4 w-4" /> 
-                    {currentUserRole === 'student' ? 'Reply to Alumni' : 'Message Student'}
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                <DialogTitle>Send a message to {targetUser.name}</DialogTitle>
-                <DialogDescription>
-                    Continue the conversation regarding this mentorship.
-                </DialogDescription>
-                </DialogHeader>
-                <Textarea
-                placeholder="Type your message here..."
-                value={replyMessage}
-                onChange={(e) => setReplyMessage(e.target.value)}
-                rows={4}
-                />
-                <DialogFooter>
-                    <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                    <Button type="button" onClick={handleAction('messaged')}>Send</Button>
-                </DialogFooter>
-            </DialogContent>
+            <Dialog open={isReplyDialogOpen} onOpenChange={setIsReplyDialogOpen}>
+              <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                      <Icons.send className="mr-2 h-4 w-4" />
+                      {currentUserRole === 'student' ? 'Reply to Alumni' : 'Message Student'}
+                  </Button>
+              </DialogTrigger>
+              <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Send a message to {targetUser.name}</DialogTitle>
+                    <DialogDescription>
+                        Continue the conversation regarding this mentorship.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Textarea
+                    placeholder="Type your message here..."
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    rows={4}
+                  />
+                  <DialogFooter>
+                      <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                      <Button type="button" onClick={handleSendMessage}>Send</Button>
+                  </DialogFooter>
+              </DialogContent>
             </Dialog>
          </CardFooter>
       )}

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -10,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card"; 
 
 export interface AlumniFiltersState {
   searchTerm: string;
@@ -28,6 +30,7 @@ interface AlumniFiltersProps {
 const defaultAvailableSkills = ["React", "Node.js", "Python", "Project Management", "Data Analysis", "UX Design", "Cloud Computing", "AI/ML"];
 const defaultAvailableIndustries = ["Technology", "Finance", "Healthcare", "Education", "Consulting", "Manufacturing"];
 
+const ALL_INDUSTRIES_VALUE = "__ALL_INDUSTRIES__";
 
 export function AlumniFilters({
   onFiltersChange,
@@ -114,12 +117,15 @@ export function AlumniFilters({
 
         <div>
           <Label htmlFor="industry-filter" className="text-sm font-medium">Filter by Industry</Label>
-          <Select value={industry} onValueChange={setIndustry}>
+          <Select 
+            value={industry === "" ? ALL_INDUSTRIES_VALUE : industry} 
+            onValueChange={(value) => setIndustry(value === ALL_INDUSTRIES_VALUE ? "" : value)}
+          >
             <SelectTrigger id="industry-filter" className="w-full">
               <SelectValue placeholder="Select industry..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Industries</SelectItem>
+              <SelectItem value={ALL_INDUSTRIES_VALUE}>All Industries</SelectItem>
               {availableIndustries.map(ind => (
                 <SelectItem key={ind} value={ind}>{ind}</SelectItem>
               ))}
@@ -151,6 +157,3 @@ export function AlumniFilters({
     </Card>
   );
 }
-
-// Need to add Card to imports if not already present elsewhere in the project
-import { Card } from "@/components/ui/card"; 

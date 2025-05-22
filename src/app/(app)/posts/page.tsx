@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -12,9 +13,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton import
 
 // Simulate current user role - replace with actual auth context
 const currentUserRole: 'student' | 'alumni' = 'student';
+
+const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 
 export default function PostsPage() {
   const [posts, setPosts] = React.useState<Post[]>([]);
@@ -80,12 +84,15 @@ export default function PostsPage() {
           </div>
           <div>
             <label htmlFor="category-filter" className="text-sm font-medium text-foreground block mb-1">Filter by Category</label>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select 
+              value={categoryFilter === "" ? ALL_CATEGORIES_VALUE : categoryFilter} 
+              onValueChange={(value) => setCategoryFilter(value === ALL_CATEGORIES_VALUE ? "" : value)}
+            >
               <SelectTrigger id="category-filter">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value={ALL_CATEGORIES_VALUE}>All Categories</SelectItem>
                 {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
               </SelectContent>
             </Select>

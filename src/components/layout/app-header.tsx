@@ -20,7 +20,7 @@ export function AppHeader() {
             variant="ghost"
             size="icon"
             onClick={toggleSidebar} // UseSidebar hook's toggle function
-            className="mr-2 md:hidden" // Only show on mobile if desktop sidebar is persistent
+            className="mr-2" // Show on all screen sizes
           >
             <Icons.menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>

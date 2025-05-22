@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -67,78 +68,88 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useIsMobile()
-    
-    const [_open, _setOpen] = React.useState(() => {
-      if (typeof document !== "undefined" && !isMobile) { // Check !isMobile here for initial state
+    const isMobileHookValue = useIsMobile(); // Will be undefined SSR, then boolean client-side
+    const [mounted, setMounted] = React.useState(false);
+
+    // Initialize _open with defaultOpen for consistent SSR and initial client render
+    const [_open, _setOpen] = React.useState(defaultOpen);
+
+    React.useEffect(() => {
+      setMounted(true); // Set mounted to true only on the client
+    }, []);
+
+    // Effect to read cookie and update _open on client side after hydration,
+    // only if not controlled and on desktop.
+    React.useEffect(() => {
+      if (mounted && openProp === undefined && !isMobileHookValue && typeof document !== "undefined") {
         const cookieValue = document.cookie
           .split("; ")
           .find((row) => row.startsWith(`${SIDEBAR_COOKIE_NAME}=`))
           ?.split("=")[1];
-        if (cookieValue) return cookieValue === "true";
+        if (cookieValue) {
+          _setOpen(cookieValue === "true");
+        }
       }
-      return defaultOpen;
-    });
+    }, [mounted, openProp, isMobileHookValue]);
 
-    const open = openProp ?? _open
-    
+    const currentOpenState = openProp !== undefined ? openProp : _open;
+
     // Effect to update cookie when 'open' state (desktop) changes and it's not controlled externally
     React.useEffect(() => {
-      if (typeof document !== "undefined" && !isMobile && openProp === undefined) {
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${open}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      if (mounted && openProp === undefined && !isMobileHookValue && typeof document !== "undefined") {
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${currentOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
       }
-    }, [open, isMobile, openProp]);
+    }, [currentOpenState, mounted, openProp, isMobileHookValue]);
 
-    const setOpen = React.useCallback(
+    const [openMobile, setOpenMobile] = React.useState(false);
+
+    const setOpenCb = React.useCallback(
       (value: React.SetStateAction<boolean>) => {
         if (setOpenProp) {
-          // If controlled, call the prop. It's up to the consumer to update openProp.
-          // Ensure to resolve the value if it's a function.
-          setOpenProp(value instanceof Function ? value(open) : value);
+          setOpenProp(value instanceof Function ? value(currentOpenState) : value);
         } else {
-          _setOpen(value); // Use internal state setter, which handles functions correctly.
+          _setOpen(value);
         }
       },
-      [setOpenProp, open, _setOpen] // `open` is needed here if value is a function and setOpenProp is used
+      [setOpenProp, currentOpenState, _setOpen]
     );
-    
-    const [openMobile, setOpenMobile] = React.useState(false)
 
     const toggleSidebar = React.useCallback(() => {
-      isMobile
-        ? setOpenMobile((prev) => !prev)
-        : setOpen((prev) => !prev)
-    }, [isMobile, setOpenMobile, setOpen])
+      if (isMobileHookValue) {
+        setOpenMobile((prev) => !prev);
+      } else {
+        setOpenCb((prev) => !prev);
+      }
+    }, [isMobileHookValue, setOpenMobile, setOpenCb]);
 
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (
-          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-          (event.metaKey || event.ctrlKey)
-        ) {
-          event.preventDefault()
-          toggleSidebar()
+        if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          toggleSidebar();
         }
+      };
+      if (mounted) { 
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
       }
+    }, [mounted, toggleSidebar]);
 
-      window.addEventListener("keydown", handleKeyDown)
-      return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [toggleSidebar])
-
-    const state = open ? "expanded" : "collapsed"
+    const state = currentOpenState ? "expanded" : "collapsed";
+    const contextIsMobile = mounted ? !!isMobileHookValue : false; // Ensure false for SSR/initial client
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
         state,
-        open,
-        setOpen,
-        isMobile,
+        open: currentOpenState,
+        setOpen: setOpenCb,
+        isMobile: contextIsMobile,
         openMobile,
         setOpenMobile,
         toggleSidebar,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
-    )
+      [state, currentOpenState, setOpenCb, contextIsMobile, openMobile, setOpenMobile, toggleSidebar]
+    );
 
     return (
       <SidebarContext.Provider value={contextValue}>
@@ -162,9 +173,9 @@ const SidebarProvider = React.forwardRef<
           </div>
         </TooltipProvider>
       </SidebarContext.Provider>
-    )
+    );
   }
-)
+);
 SidebarProvider.displayName = "SidebarProvider"
 
 const Sidebar = React.forwardRef<
@@ -186,7 +197,12 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const [hasMounted, setHasMounted] = React.useState(false);
+
+    React.useEffect(() => {
+      setHasMounted(true);
+    }, []);
 
     if (collapsible === "none") {
       return (
@@ -200,7 +216,15 @@ const Sidebar = React.forwardRef<
         >
           {children}
         </div>
-      )
+      );
+    }
+
+    if (!hasMounted) {
+        // Render nothing or a placeholder on the server and initial client render
+        // to ensure consistency before client-side mobile check.
+        // This ensures the structure rendered by server (which sees isMobile as false)
+        // matches the initial client structure.
+        return null; 
     }
 
     if (isMobile) {
@@ -220,7 +244,7 @@ const Sidebar = React.forwardRef<
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
-      )
+      );
     }
 
     return (
@@ -265,9 +289,9 @@ const Sidebar = React.forwardRef<
           </div>
         </div>
       </div>
-    )
+    );
   }
-)
+);
 Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
@@ -333,7 +357,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background overflow-y-auto", // Changed to overflow-y-auto
+        "relative flex min-h-svh flex-1 flex-col bg-background overflow-y-auto", 
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)] md:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width)_+_theme(spacing.2))] md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className
       )}
@@ -594,7 +618,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed" || isMobile}
+          hidden={(state !== "collapsed" && state !== "expanded") || isMobile || state === "expanded"} // Hide if not collapsed OR if mobile OR if expanded (for icon only tooltips)
           {...tooltip}
         />
       </Tooltip>

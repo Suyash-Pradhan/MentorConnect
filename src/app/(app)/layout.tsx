@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <AppSidebar /> {/* This will be positioned fixed or absolutely by its own styles */}
         <SidebarInset> {/* This component handles the main content area adjustment */}
           <AppHeader />
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
+          <main className="flex-1 p-4 md:p-6 lg:p-8"> {/* Removed overflow-auto */}
             {children}
           </main>
         </SidebarInset>

@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 
 // Simulate current user - replace with actual auth context
 const currentUserId = "student123"; // Can be "student123" or "alumni456" etc.
@@ -171,3 +172,4 @@ const RequestCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
+

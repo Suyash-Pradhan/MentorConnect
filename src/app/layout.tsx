@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
-        suppressHydrationWarning // Added here
+        suppressHydrationWarning // Ensure this is present for body tag mismatches
       >
         <Providers>
           {children}

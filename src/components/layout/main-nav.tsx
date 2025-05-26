@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -24,7 +25,7 @@ import {
   SidebarMenuSubItem,
   SidebarGroupLabel,
   useSidebar,
-} from "@/components/ui/sidebar"; // Assuming these are part of shadcn sidebar
+} from "@/components/ui/sidebar";
 
 interface MainNavProps {
   items?: SidebarNavItem[];
@@ -33,7 +34,12 @@ interface MainNavProps {
 
 export function MainNav({ items, userRole }: MainNavProps) {
   const pathname = usePathname();
-  const { open, state: sidebarState, isMobile } = useSidebar(); // Get sidebar state
+  const { open, state: sidebarState, isMobile } = useSidebar();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!items?.length) {
     return null;
@@ -53,7 +59,7 @@ export function MainNav({ items, userRole }: MainNavProps) {
             <SidebarMenuItem key={index}>
               <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
-                  isActive={pathname === item.href}
+                  isActive={mounted ? pathname === item.href : false}
                   tooltip={item.title}
                   className={cn(
                     "w-full justify-start",
@@ -90,7 +96,7 @@ export function MainNav({ items, userRole }: MainNavProps) {
                           <SidebarMenuSubItem key={subIndex}>
                              <Link href={subItem.href} legacyBehavior passHref>
                               <SidebarMenuSubButton
-                                isActive={pathname === subItem.href}
+                                isActive={mounted ? pathname === subItem.href : false}
                                 className="w-full justify-start"
                               >
                                 {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}

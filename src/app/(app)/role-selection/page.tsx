@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
-import type { Role } from "@/types";
+import type { Role, Profile } from "@/types";
+import { getProfile, setProfile, initializeRoleProfile } from "@/services/profileService";
+
+// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
+const MOCK_CURRENT_USER_ID = "user123_dev"; // Replace with actual dynamic user ID
+const MOCK_CURRENT_USER_EMAIL = "user@example.com"; // Replace with actual dynamic user email
+
 
 export default function RoleSelectionPage() {
   const router = useRouter();
@@ -14,22 +21,57 @@ export default function RoleSelectionPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedRole, setSelectedRole] = React.useState<Role | null>(null);
 
-  const handleRoleSelection = async (role: Role) => {
-    if (isLoading) return;
+  const handleRoleSelection = async (role: 'student' | 'alumni') => {
+    if (isLoading || !MOCK_CURRENT_USER_ID) {
+      toast({ variant: "destructive", title: "Error", description: "User not authenticated or operation in progress." });
+      return;
+    }
     setSelectedRole(role);
     setIsLoading(true);
 
-    // Simulate API call to save role
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Role selected:", role);
-    // In a real app, save the role to the database for the current user.
+    try {
+      let userProfile = await getProfile(MOCK_CURRENT_USER_ID);
 
-    setIsLoading(false);
-    toast({
-      title: "Role Selected!",
-      description: `You are now registered as a ${role}. Redirecting to dashboard...`,
-    });
-    router.push("/dashboard");
+      if (!userProfile) {
+        // If profile doesn't exist, create a basic one
+        userProfile = {
+          id: MOCK_CURRENT_USER_ID,
+          email: MOCK_CURRENT_USER_EMAIL, // TODO: Get from auth
+          role: role,
+          createdAt: new Date(), // Will be converted to serverTimestamp by setProfile if new
+          name: "", // User will fill this in "Edit Profile"
+        };
+      } else {
+        userProfile.role = role;
+      }
+
+      // Initialize or update role-specific profile
+      if (role === 'student') {
+        userProfile.studentProfile = userProfile.studentProfile || initializeRoleProfile('student');
+        userProfile.alumniProfile = undefined; // Clear other role's profile
+      } else {
+        userProfile.alumniProfile = userProfile.alumniProfile || initializeRoleProfile('alumni');
+        userProfile.studentProfile = undefined; // Clear other role's profile
+      }
+      
+      await setProfile(MOCK_CURRENT_USER_ID, userProfile);
+
+      toast({
+        title: "Role Selected!",
+        description: `You are now registered as a ${role}. Redirecting to dashboard...`,
+      });
+      router.push("/dashboard");
+
+    } catch (error) {
+      console.error("Error saving role:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save your role. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -73,7 +115,7 @@ export default function RoleSelectionPage() {
         </CardContent>
         <CardFooter className="text-center p-6">
           <p className="text-sm text-muted-foreground">
-            Your role selection helps us connect you with the right people and resources. This can be changed later if needed (though usually set once).
+            Your role selection helps us connect you with the right people and resources.
           </p>
         </CardFooter>
       </Card>

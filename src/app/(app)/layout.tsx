@@ -19,11 +19,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={true}> {/* Control sidebar state */}
-      <div className="flex min-h-screen flex-col bg-background">
-        <AppSidebar /> {/* This will be positioned fixed or absolutely by its own styles */}
+      <div className="flex min-h-screen bg-background"> {/* Removed flex-col, defaults to flex-row */}
+        <AppSidebar /> {/* This will be positioned fixed or absolutely by its own styles, or render a spacer */}
         <SidebarInset> {/* This component handles the main content area adjustment and is a <main> element itself */}
           <AppHeader />
-          <div className="p-4 md:p-6 lg:p-8"> {/* Changed main to div and removed flex-1 */}
+          <div className="p-4 md:p-6 lg:p-8">
             {children}
           </div>
         </SidebarInset>

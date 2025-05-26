@@ -5,10 +5,12 @@
  *
  * - getProfile - Fetches a user profile.
  * - setProfile - Creates or updates a user profile.
+ * - initializeRoleProfile - Initializes a basic profile structure based on role.
+ * - getProfilesByRole - Fetches all user profiles matching a specific role.
  */
 import { db } from '@/lib/firebase';
-import type { Profile, StudentProfile, AlumniProfile } from '@/types';
-import { doc, getDoc, setDoc, Timestamp, serverTimestamp, type FieldValue } from 'firebase/firestore';
+import type { Profile, StudentProfile, AlumniProfile, Role } from '@/types';
+import { doc, getDoc, setDoc, Timestamp, serverTimestamp, type FieldValue, collection, query, where, getDocs } from 'firebase/firestore';
 
 // Helper to convert Firestore Timestamps to Dates in a nested object
 function convertTimestampsToDates(data: any): any {
@@ -119,3 +121,22 @@ export async function initializeRoleProfile(role: 'student' | 'alumni'): Promise
   }
 }
 
+export async function getProfilesByRole(role: Role): Promise<Profile[]> {
+  if (!role) {
+    console.error("getProfilesByRole: role is required");
+    return [];
+  }
+  try {
+    const usersCollectionRef = collection(db, 'users');
+    const q = query(usersCollectionRef, where('role', '==', role));
+    const querySnapshot = await getDocs(q);
+    const profiles: Profile[] = [];
+    querySnapshot.forEach((doc) => {
+      profiles.push({ id: doc.id, ...convertTimestampsToDates(doc.data()) } as Profile);
+    });
+    return profiles;
+  } catch (error) {
+    console.error(`Error fetching profiles for role ${role}:`, error);
+    throw error; // Re-throw to be handled by caller
+  }
+}

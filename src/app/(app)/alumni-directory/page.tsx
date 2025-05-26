@@ -1,13 +1,14 @@
+
 "use client";
 
 import * as React from "react";
 import { AlumniCard } from "@/components/alumni/alumni-card";
 import { AlumniFilters, type AlumniFiltersState } from "@/components/alumni/alumni-filters";
-import { placeholderProfiles } from "@/lib/placeholders"; // Using placeholder data
 import type { Profile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getProfilesByRole } from "@/services/profileService"; // Import the service
 
 export default function AlumniDirectoryPage() {
   const { toast } = useToast();
@@ -15,49 +16,57 @@ export default function AlumniDirectoryPage() {
   const [allAlumni, setAllAlumni] = React.useState<Profile[]>([]);
   const [filteredAlumni, setFilteredAlumni] = React.useState<Profile[]>([]);
   
-  // Simulate fetching alumni data
   React.useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const alumniData = placeholderProfiles.filter(p => p.role === 'alumni');
-      setAllAlumni(alumniData);
-      setFilteredAlumni(alumniData);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    const fetchAlumni = async () => {
+      setIsLoading(true);
+      try {
+        const alumniData = await getProfilesByRole('alumni');
+        setAllAlumni(alumniData);
+        setFilteredAlumni(alumniData);
+      } catch (error) {
+        console.error("Failed to fetch alumni:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not load alumni data. Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAlumni();
+  }, [toast]);
 
   const handleFilterChange = React.useCallback((filters: AlumniFiltersState) => {
-    setIsLoading(true);
-    // Simulate filtering delay
-    setTimeout(() => {
-      let result = allAlumni;
-      if (filters.searchTerm) {
-        result = result.filter(alumni =>
-          alumni.name?.toLowerCase().includes(filters.searchTerm.toLowerCase())
-        );
-      }
-      if (filters.skills.length > 0) {
-        result = result.filter(alumni =>
-          filters.skills.every(skill => alumni.alumniProfile?.skills.includes(skill))
-        );
-      }
-      if (filters.industry) {
-        result = result.filter(alumni =>
-          alumni.alumniProfile?.industry.toLowerCase() === filters.industry.toLowerCase()
-        );
-      }
-      if (filters.company) {
-        result = result.filter(alumni =>
-          alumni.alumniProfile?.company.toLowerCase().includes(filters.company.toLowerCase())
-        );
-      }
-      setFilteredAlumni(result);
-      setIsLoading(false);
-    }, 500);
+    // No need to set isLoading here unless filtering is a very heavy operation
+    // For client-side filtering, it's usually fast enough.
+    let result = allAlumni;
+    if (filters.searchTerm) {
+      result = result.filter(alumni =>
+        alumni.name?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        alumni.email?.toLowerCase().includes(filters.searchTerm.toLowerCase())
+      );
+    }
+    if (filters.skills.length > 0) {
+      result = result.filter(alumni =>
+        filters.skills.every(skill => alumni.alumniProfile?.skills.includes(skill))
+      );
+    }
+    if (filters.industry) {
+      result = result.filter(alumni =>
+        alumni.alumniProfile?.industry.toLowerCase() === filters.industry.toLowerCase()
+      );
+    }
+    if (filters.company) {
+      result = result.filter(alumni =>
+        alumni.alumniProfile?.company.toLowerCase().includes(filters.company.toLowerCase())
+      );
+    }
+    setFilteredAlumni(result);
   }, [allAlumni]);
 
   const handleMentorshipRequest = (alumniId: string, message: string) => {
-    // Simulate sending mentorship request
+    // TODO: Implement actual mentorship request saving to Firestore in a later step
     console.log(`Mentorship request to ${alumniId}: ${message}`);
     toast({
       title: "Mentorship Request Sent!",
@@ -112,7 +121,7 @@ export default function AlumniDirectoryPage() {
           <Icons.search className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold text-foreground">No Alumni Found</h3>
           <p className="text-muted-foreground">
-            Try adjusting your search filters or check back later.
+            There are currently no alumni profiles matching your criteria or no alumni have registered yet. Try adjusting your search filters or check back later.
           </p>
         </div>
       )}

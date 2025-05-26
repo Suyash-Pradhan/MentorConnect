@@ -47,10 +47,10 @@ export default function RoleSelectionPage() {
 
       // Initialize or update role-specific profile
       if (role === 'student') {
-        userProfile.studentProfile = userProfile.studentProfile || initializeRoleProfile('student');
+        userProfile.studentProfile = userProfile.studentProfile || await initializeRoleProfile('student');
         userProfile.alumniProfile = undefined; // Clear other role's profile
       } else {
-        userProfile.alumniProfile = userProfile.alumniProfile || initializeRoleProfile('alumni');
+        userProfile.alumniProfile = userProfile.alumniProfile || await initializeRoleProfile('alumni');
         userProfile.studentProfile = undefined; // Clear other role's profile
       }
       
@@ -122,3 +122,4 @@ export default function RoleSelectionPage() {
     </div>
   );
 }
+

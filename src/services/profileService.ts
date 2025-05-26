@@ -99,7 +99,7 @@ export async function setProfile(userId: string, profileData: Partial<Profile>):
 }
 
 // Initializes a basic profile structure based on role
-export function initializeRoleProfile(role: 'student' | 'alumni'): StudentProfile | AlumniProfile {
+export async function initializeRoleProfile(role: 'student' | 'alumni'): Promise<StudentProfile | AlumniProfile> {
   if (role === 'student') {
     return {
       college: '',

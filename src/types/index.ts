@@ -1,3 +1,4 @@
+
 export type Role = 'student' | 'alumni' | 'admin';
 
 export interface User {
@@ -36,7 +37,7 @@ export interface MentorshipRequest {
   id: string;
   studentId: string;
   studentName: string; // Denormalized for easier display
-  studentAvatar?: string; 
+  studentAvatar?: string;
   alumniId: string;
   alumniName: string; // Denormalized
   alumniAvatar?: string;
@@ -57,7 +58,7 @@ export interface Post {
   tags: string[];
   category: string;
   createdAt: Date;
-  updatedAt?: Date;
+  updatedAt?: Date; // Added for tracking updates
 }
 
 export interface Comment {

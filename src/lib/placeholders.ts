@@ -1,4 +1,5 @@
-import type { Profile, MentorshipRequest, Post, DiscussionThread, Comment } from "@/types";
+
+import type { Profile, MentorshipRequest, DiscussionThread, Comment } from "@/types";
 
 export const placeholderUserStudent: Profile = {
   id: "student123",
@@ -127,42 +128,6 @@ export const placeholderMentorshipRequests: MentorshipRequest[] = [
     requestedAt: new Date("2024-07-15T11:00:00Z"),
     respondedAt: new Date("2024-07-16T17:00:00Z"),
     studentGoals: "To become a proficient AI engineer and contribute to innovative tech solutions."
-  },
-];
-
-export const placeholderPosts: Post[] = [
-  {
-    id: "post1",
-    authorId: "alumni456",
-    authorName: "Priya Verma",
-    authorAvatar: "https://placehold.co/100x100.png?text=PV",
-    title: "Navigating Your First Tech Job Interview",
-    content: "Landing your first tech job can be daunting. Here are some tips to help you prepare for interviews, from technical rounds to HR discussions. Focus on fundamentals, practice coding problems, and be ready to talk about your projects...",
-    tags: ["career advice", "interviews", "tech jobs"],
-    category: "Career Guidance",
-    createdAt: new Date("2024-07-22T09:00:00Z"),
-  },
-  {
-    id: "post2",
-    authorId: "alumni789",
-    authorName: "Rohan Meena",
-    authorAvatar: "https://placehold.co/100x100.png?text=RM",
-    title: "The Rise of Product Management in India",
-    content: "Product Management is a rapidly growing field. This post explores the key responsibilities of a PM, skills required, and how to transition into this exciting career path...",
-    tags: ["product management", "career transition", "fintech"],
-    category: "Industry Insights",
-    createdAt: new Date("2024-07-20T14:30:00Z"),
-  },
-  {
-    id: "post3",
-    authorId: "alumni001",
-    authorName: "Sunita Kumari",
-    authorAvatar: "https://placehold.co/100x100.png?text=SK",
-    title: "Job Opening: Junior Data Analyst at Analytics Corp",
-    content: "We are hiring for a Junior Data Analyst position at Analytics Corp! Ideal candidates should have a strong understanding of SQL, Python, and basic statistical concepts. Apply via the link...",
-    tags: ["job opening", "data analyst", "entry level"],
-    category: "Job Opportunities",
-    createdAt: new Date("2024-07-25T11:00:00Z"),
   },
 ];
 

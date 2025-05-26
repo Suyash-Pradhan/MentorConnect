@@ -2,9 +2,8 @@
 "use client";
 
 import React from 'react';
-import { placeholderPosts } from '@/lib/placeholders';
 import type { Post } from '@/types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription, CardFooter as not used directly in this component for the items
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,38 +12,69 @@ import { formatDistanceToNow } from 'date-fns';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton import
+import { Skeleton } from '@/components/ui/skeleton';
+import { getAllPosts } from '@/services/postService'; // Import the service
+import { useToast } from '@/hooks/use-toast';
 
 // Simulate current user role - replace with actual auth context
-const currentUserRole: 'student' | 'alumni' = 'student';
+const currentUserRole: 'student' | 'alumni' = 'student'; // Example, would come from auth context
 
 const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 
 export default function PostsPage() {
-  const [posts, setPosts] = React.useState<Post[]>([]);
+  const { toast } = useToast();
+  const [allPosts, setAllPosts] = React.useState<Post[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
 
   React.useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setPosts(placeholderPosts);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    const fetchPosts = async () => {
+      setIsLoading(true);
+      try {
+        const postsData = await getAllPosts();
+        setAllPosts(postsData);
+      } catch (error) {
+        console.error("Failed to fetch posts:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not load posts. Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPosts();
+  }, [toast]);
 
-  const filteredPosts = posts
+  const filteredPosts = allPosts
     .filter(post => post.title.toLowerCase().includes(searchTerm.toLowerCase()) || post.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    .filter(post => categoryFilter ? post.category === categoryFilter : true);
+    .filter(post => categoryFilter && categoryFilter !== ALL_CATEGORIES_VALUE ? post.category === categoryFilter : true);
 
-  const categories = Array.from(new Set(posts.map(p => p.category)));
+  const categories = React.useMemo(() => {
+    return Array.from(new Set(allPosts.map(p => p.category))).sort();
+  }, [allPosts]);
+
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <Skeleton className="h-10 w-48 mb-2" />
+                <Skeleton className="h-5 w-72" />
+            </div>
+            {currentUserRole === 'alumni' && <Skeleton className="h-10 w-36" />}
+        </div>
+        <Card className="mb-6 p-4 shadow-sm bg-secondary">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        </Card>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => <PostCardSkeleton key={i} />)}
+          {Array.from({ length: 6 }).map((_, i) => <PostCardSkeleton key={i} />)}
         </div>
       </div>
     );
@@ -59,7 +89,7 @@ export default function PostsPage() {
         </div>
         {currentUserRole === 'alumni' && (
           <Button asChild>
-            <Link href="/posts/create">
+            <Link href="/posts/create"> {/* TODO: Create this page */}
               <Icons.add className="mr-2 h-4 w-4" /> Create New Post
             </Link>
           </Button>
@@ -84,8 +114,8 @@ export default function PostsPage() {
           </div>
           <div>
             <label htmlFor="category-filter" className="text-sm font-medium text-foreground block mb-1">Filter by Category</label>
-            <Select 
-              value={categoryFilter === "" ? ALL_CATEGORIES_VALUE : categoryFilter} 
+            <Select
+              value={categoryFilter || ALL_CATEGORIES_VALUE}
               onValueChange={(value) => setCategoryFilter(value === ALL_CATEGORIES_VALUE ? "" : value)}
             >
               <SelectTrigger id="category-filter">
@@ -111,7 +141,7 @@ export default function PostsPage() {
         <div className="text-center py-12">
           <Icons.posts className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold">No Posts Found</h3>
-          <p className="text-muted-foreground">Try adjusting your search or check back later.</p>
+          <p className="text-muted-foreground">Try adjusting your search or check back later for new posts.</p>
         </div>
       )}
     </div>
@@ -125,7 +155,7 @@ function PostCard({ post }: { post: Post }) {
         <div className="flex items-center gap-3 mb-2">
           <Avatar className="h-10 w-10">
             <AvatarImage src={post.authorAvatar || `https://placehold.co/40x40.png`} alt={post.authorName} data-ai-hint="person professional"/>
-            <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{post.authorName ? post.authorName.charAt(0).toUpperCase() : 'A'}</AvatarFallback>
           </Avatar>
           <div>
             <p className="font-semibold text-foreground">{post.authorName}</p>

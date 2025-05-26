@@ -4,13 +4,12 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { placeholderThreads, placeholderComments, placeholderUserStudent, placeholderUserAlumni } from "@/lib/placeholders"; // Using placeholder data
-import type { DiscussionThread, Comment as ThreadComment, Role } from "@/types"; // Renamed to avoid conflict with React.Comment
+import type { DiscussionThread, Comment as ThreadCommentType, Role, Profile } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -18,33 +17,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { getDiscussionThreadById, getCommentsForThread, addCommentToThread } from "@/services/discussionService";
+import { getProfile } from "@/services/profileService";
 
-// Simulate current user - replace with actual auth context
-const getCurrentUser = () => {
-  // This is a mock. In a real app, this would come from your auth provider.
-  // Randomly pick student or alumni for demo purposes
-  const isStudent = Math.random() > 0.5;
-  if (isStudent) {
-    return {
-      id: placeholderUserStudent.id,
-      name: placeholderUserStudent.name,
-      avatarUrl: placeholderUserStudent.avatarUrl,
-      role: placeholderUserStudent.role as Role,
-    };
-  }
-  return {
-      id: placeholderUserAlumni.id,
-      name: placeholderUserAlumni.name,
-      avatarUrl: placeholderUserAlumni.avatarUrl,
-      role: placeholderUserAlumni.role as Role,
-  };
-};
-
+// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 const commentSchema = z.object({
   content: z.string().min(1, "Comment cannot be empty.").max(1000, "Comment is too long."),
 });
-
 type CommentFormValues = z.infer<typeof commentSchema>;
 
 export default function SingleDiscussionPage() {
@@ -54,9 +35,9 @@ export default function SingleDiscussionPage() {
   const { toast } = useToast();
 
   const [thread, setThread] = React.useState<DiscussionThread | null | undefined>(undefined);
-  const [comments, setComments] = React.useState<ThreadComment[]>([]);
+  const [comments, setComments] = React.useState<ThreadCommentType[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [currentUser, setCurrentUser] = React.useState<{id: string, name: string, avatarUrl?: string, role: Role} | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
 
   const form = useForm<CommentFormValues>({
     resolver: zodResolver(commentSchema),
@@ -64,54 +45,67 @@ export default function SingleDiscussionPage() {
   });
 
   React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
-  }, []);
-  
-  React.useEffect(() => {
-    setIsLoading(true);
-    if (threadId) {
-      // Simulate fetching thread and comments
-      setTimeout(() => {
-        const foundThread = placeholderThreads.find(t => t.id === threadId);
-        setThread(foundThread || null);
-        if (foundThread) {
-          // Simulate fetching comments for this thread (using placeholders for now)
-          // In a real app, you'd filter comments by threadId
-          const threadComments = placeholderComments.filter(c => Math.random() > 0.3); // Randomly assign some comments for demo
-          setComments(threadComments);
-        }
+    const fetchThreadData = async () => {
+      if (!threadId) {
+        setThread(null);
         setIsLoading(false);
-      }, 500);
-    } else {
-      setThread(null);
-      setIsLoading(false);
-    }
-  }, [threadId]);
-
-  const handleAddComment = (values: CommentFormValues) => {
-    if (!currentUser) {
-        toast({ variant: "destructive", title: "Error", description: "You must be logged in to comment."});
         return;
-    }
-    console.log("Adding comment:", values.content);
-    const newComment: ThreadComment = {
-      id: `comment-${Date.now()}`,
-      authorId: currentUser.id,
-      authorName: currentUser.name,
-      authorAvatar: currentUser.avatarUrl,
-      authorRole: currentUser.role,
-      content: values.content,
-      createdAt: new Date(),
+      }
+      setIsLoading(true);
+      try {
+        const [fetchedThread, fetchedComments, userProfile] = await Promise.all([
+          getDiscussionThreadById(threadId),
+          getCommentsForThread(threadId),
+          getProfile(MOCK_CURRENT_USER_ID) // Fetch current user for posting comments
+        ]);
+        setThread(fetchedThread);
+        setComments(fetchedComments);
+        setCurrentUserProfile(userProfile);
+      } catch (error) {
+        console.error("Error fetching discussion details:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load discussion." });
+        setThread(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    setComments(prev => [newComment, ...prev]); // Add to top for visibility
-    // Also update thread's lastActivityAt
-    if (thread) {
-        setThread(prev => prev ? {...prev, lastActivityAt: new Date()} : null);
-    }
-    toast({ title: "Comment Added!", description: "Your comment has been posted."});
-    form.reset();
-  };
+    fetchThreadData();
+  }, [threadId, toast]);
 
+  const handleAddComment = async (values: CommentFormValues) => {
+    if (!currentUserProfile || !thread) {
+      toast({ variant: "destructive", title: "Error", description: "You must be logged in to comment or thread is missing." });
+      return;
+    }
+    form.formState.isSubmitting; // mark as used
+    try {
+      const newCommentData: Omit<ThreadCommentType, 'id' | 'createdAt'> = {
+        threadId: thread.id,
+        authorId: currentUserProfile.id,
+        authorName: currentUserProfile.name || "Anonymous",
+        authorAvatar: currentUserProfile.avatarUrl,
+        authorRole: currentUserProfile.role || 'student', // Default to student if role is somehow null
+        content: values.content,
+      };
+      const newCommentId = await addCommentToThread(thread.id, newCommentData);
+      const displayNewComment: ThreadCommentType = {
+        ...newCommentData,
+        id: newCommentId,
+        createdAt: new Date(),
+      };
+      setComments(prev => [displayNewComment, ...prev]);
+      // Update thread's lastActivityAt and commentsCount locally for immediate feedback if needed,
+      // or re-fetch thread. For simplicity, we are not re-fetching here.
+      if(thread) {
+        setThread(prev => prev ? {...prev, lastActivityAt: new Date(), commentsCount: (prev.commentsCount || 0) + 1} : null )
+      }
+      toast({ title: "Comment Added!", description: "Your comment has been posted." });
+      form.reset();
+    } catch (error) {
+      console.error("Failed to add comment:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not post comment." });
+    }
+  };
 
   if (isLoading || thread === undefined) {
     return <DiscussionPageSkeleton />;
@@ -146,10 +140,11 @@ export default function SingleDiscussionPage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={thread.creatorAvatar || `https://placehold.co/32x32.png`} alt={thread.creatorName} data-ai-hint="person"/>
-              <AvatarFallback>{thread.creatorName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{thread.creatorName?.charAt(0)?.toUpperCase() || 'A'}</AvatarFallback>
             </Avatar>
             <span>
               Started by <Link href={`/profile/${thread.createdBy}`} className="font-medium text-foreground hover:underline">{thread.creatorName}</Link>
+              {thread.creatorRole && <span className="text-xs capitalize"> ({thread.creatorRole})</span>}
             </span>
             <span>•</span>
             <span>{formatDistanceToNow(new Date(thread.createdAt), { addSuffix: true })}</span>
@@ -165,13 +160,12 @@ export default function SingleDiscussionPage() {
           <CardTitle className="text-xl">Comments ({comments.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Form to add new comment */}
-          {currentUser && (
+          {currentUserProfile && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleAddComment)} className="flex items-start gap-3 p-4 border rounded-lg bg-secondary/50">
                 <Avatar className="h-10 w-10 mt-1">
-                  <AvatarImage src={currentUser.avatarUrl || `https://placehold.co/40x40.png`} alt={currentUser.name} data-ai-hint="person"/>
-                  <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={currentUserProfile.avatarUrl || `https://placehold.co/40x40.png`} alt={currentUserProfile.name || "User"} data-ai-hint="person"/>
+                  <AvatarFallback>{currentUserProfile.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
                    <FormField
@@ -201,14 +195,12 @@ export default function SingleDiscussionPage() {
               </form>
             </Form>
           )}
-          {!currentUser && (
+          {!currentUserProfile && (
             <p className="text-muted-foreground text-center p-4 border rounded-md">
                 <Link href="/login" className="text-primary hover:underline font-semibold">Log in</Link> or <Link href="/signup" className="text-primary hover:underline font-semibold">sign up</Link> to post a comment.
             </p>
           )}
 
-
-          {/* List of comments */}
           {comments.length > 0 ? (
             <div className="space-y-4">
               {comments.map(comment => (
@@ -224,12 +216,12 @@ export default function SingleDiscussionPage() {
   );
 }
 
-function CommentCard({ comment }: { comment: ThreadComment }) {
+function CommentCard({ comment }: { comment: ThreadCommentType }) {
   return (
     <div className="flex items-start gap-3 p-4 border rounded-lg shadow-sm bg-card">
       <Avatar className="h-10 w-10">
         <AvatarImage src={comment.authorAvatar || `https://placehold.co/40x40.png`} alt={comment.authorName} data-ai-hint="person"/>
-        <AvatarFallback>{comment.authorName.charAt(0)}</AvatarFallback>
+        <AvatarFallback>{comment.authorName?.charAt(0)?.toUpperCase() || 'A'}</AvatarFallback>
       </Avatar>
       <div className="flex-1">
         <div className="flex items-center justify-between">
@@ -296,5 +288,3 @@ const DiscussionPageSkeleton = () => (
     </Card>
   </div>
 );
-
-    

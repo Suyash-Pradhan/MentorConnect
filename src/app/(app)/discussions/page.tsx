@@ -1,8 +1,8 @@
+
 "use client";
 
 import React from 'react';
-import { placeholderThreads } from '@/lib/placeholders';
-import type { DiscussionThread } from '@/types';
+import type { DiscussionThread, Profile } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -22,18 +22,16 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAllDiscussionThreads, createDiscussionThread } from '@/services/discussionService';
+import { getProfile } from '@/services/profileService'; // To get current user details
 
-
-// Simulate current user role - replace with actual auth context
-const currentUserRole: 'student' | 'alumni' = 'alumni';
-const currentUserId = "alumni456"; // Example current user ID
-const currentUserName = "Priya Verma"; // Example current user name
-const currentUserAvatar = "https://placehold.co/100x100.png?text=PV";
+// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 const newThreadSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100),
@@ -46,6 +44,7 @@ export default function DiscussionsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
   const { toast } = useToast();
 
   const form = useForm<NewThreadFormValues>({
@@ -53,41 +52,75 @@ export default function DiscussionsPage() {
     defaultValues: { title: "", content: "" },
   });
 
-
   React.useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setThreads(placeholderThreads);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      try {
+        const [fetchedThreads, userProfile] = await Promise.all([
+          getAllDiscussionThreads(),
+          getProfile(MOCK_CURRENT_USER_ID)
+        ]);
+        setThreads(fetchedThreads);
+        setCurrentUserProfile(userProfile);
+      } catch (error) {
+        console.error("Error fetching discussion data:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load discussions." });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, [toast]);
 
   const filteredThreads = threads
     .filter(thread => thread.title.toLowerCase().includes(searchTerm.toLowerCase()) || thread.content.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleCreateThread = (values: NewThreadFormValues) => {
-    // Simulate API call to create thread
-    console.log("Creating new thread:", values);
-    const newThread: DiscussionThread = {
-      id: `thread-${Date.now()}`,
-      title: values.title,
-      content: values.content,
-      createdBy: currentUserId,
-      creatorName: currentUserName,
-      creatorAvatar: currentUserAvatar,
-      createdAt: new Date(),
-      lastActivityAt: new Date(),
-      comments: [],
-    };
-    setThreads(prev => [newThread, ...prev]);
-    toast({ title: "Thread Created!", description: "Your new discussion thread has been posted." });
-    setIsCreateDialogOpen(false);
-    form.reset();
+  const handleCreateThread = async (values: NewThreadFormValues) => {
+    if (!currentUserProfile || currentUserProfile.role !== 'alumni') {
+      toast({ variant: "destructive", title: "Permission Denied", description: "Only alumni can create new discussion threads." });
+      return;
+    }
+    form.formState.isSubmitting; // to mark as used
+    try {
+      const newThreadData: Omit<DiscussionThread, 'id' | 'createdAt' | 'lastActivityAt' | 'commentsCount'> = {
+        title: values.title,
+        content: values.content,
+        createdBy: currentUserProfile.id,
+        creatorName: currentUserProfile.name || "Anonymous Alumni",
+        creatorAvatar: currentUserProfile.avatarUrl,
+        creatorRole: 'alumni', // Explicitly set
+      };
+      const newThreadId = await createDiscussionThread(newThreadData);
+      // For immediate UI update, we create a client-side representation.
+      // Ideally, re-fetch or get the created object from the service.
+      const displayNewThread: DiscussionThread = {
+        ...newThreadData,
+        id: newThreadId,
+        createdAt: new Date(),
+        lastActivityAt: new Date(),
+        commentsCount: 0,
+      };
+      setThreads(prev => [displayNewThread, ...prev]);
+      toast({ title: "Thread Created!", description: "Your new discussion thread has been posted." });
+      setIsCreateDialogOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error("Failed to create thread:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not create thread." });
+    }
   };
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <Skeleton className="h-10 w-64 mb-2" />
+                <Skeleton className="h-5 w-80" />
+            </div>
+            <Skeleton className="h-10 w-48" />
+        </div>
+        <Skeleton className="h-12 w-full mb-6"/>
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => <ThreadCardSkeleton key={i} />)}
         </div>
@@ -102,7 +135,7 @@ export default function DiscussionsPage() {
           <h1 className="text-4xl font-bold text-foreground">Discussions</h1>
           <p className="text-lg text-muted-foreground">Engage in conversations, ask questions, and share knowledge.</p>
         </div>
-        {currentUserRole === 'alumni' && (
+        {currentUserProfile?.role === 'alumni' && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -167,7 +200,6 @@ export default function DiscussionsPage() {
         </div>
       </Card>
 
-
       {filteredThreads.length > 0 ? (
         <div className="space-y-4">
           {filteredThreads.map(thread => (
@@ -195,7 +227,7 @@ function ThreadCard({ thread }: { thread: DiscussionThread }) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Avatar className="h-6 w-6">
             <AvatarImage src={thread.creatorAvatar || `https://placehold.co/24x24.png`} alt={thread.creatorName} data-ai-hint="person"/>
-            <AvatarFallback>{thread.creatorName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{thread.creatorName?.charAt(0)?.toUpperCase() || 'A'}</AvatarFallback>
           </Avatar>
           <span>Started by <Link href={`/profile/${thread.createdBy}`} className="font-medium hover:underline">{thread.creatorName}</Link></span>
           <span>•</span>
@@ -207,7 +239,7 @@ function ThreadCard({ thread }: { thread: DiscussionThread }) {
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground flex justify-between items-center pt-3 border-t">
         <div>
-          <span>{thread.comments.length} comments</span>
+          <span>{thread.commentsCount || 0} comments</span>
           <span className="mx-1">•</span>
           <span>Last activity: {formatDistanceToNow(new Date(thread.lastActivityAt), { addSuffix: true })}</span>
         </div>
@@ -239,3 +271,4 @@ const ThreadCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
+

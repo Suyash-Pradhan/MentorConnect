@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Profile } from "@/types";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
-import Link from "next/link";
+// Link import removed as it's not used
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -23,8 +24,8 @@ import React from "react";
 import { ViewProfile } from "../profile/view-profile"; // For detailed view
 
 interface AlumniCardProps {
-  alumni: Profile; // Expecting a profile with alumni data
-  onMentorshipRequest: (alumniId: string, message: string) => void; // Callback for request
+  alumni: Profile; 
+  onMentorshipRequest: (message: string) => void; // Simplified: expects only message, alumni passed in parent
 }
 
 export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
@@ -33,9 +34,8 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
   const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
-
   if (alumni.role !== 'alumni' || !alumni.alumniProfile) {
-    return null; // Or some fallback UI if a non-alumni profile is passed
+    return null; 
   }
 
   const { name, email, avatarUrl, alumniProfile } = alumni;
@@ -46,9 +46,9 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
       toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
       return;
     }
-    onMentorshipRequest(alumni.id, message);
+    onMentorshipRequest(message); // Pass only message
     setIsRequestDialogOpen(false);
-    setMessage(""); // Reset message
+    setMessage(""); 
   };
 
   return (
@@ -90,7 +90,6 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
             <DialogHeader>
               <DialogTitle className="text-2xl">{alumni.name}'s Profile</DialogTitle>
             </DialogHeader>
-            {/* Using ViewProfile component for detailed view */}
             <ViewProfile profile={alumni} />
             <DialogFooter>
                 <DialogClose asChild>

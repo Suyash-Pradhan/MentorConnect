@@ -1,4 +1,5 @@
 
+
 export type Role = 'student' | 'alumni' | 'admin';
 
 export interface User {
@@ -38,14 +39,15 @@ export interface MentorshipRequest {
   studentId: string;
   studentName: string; // Denormalized for easier display
   studentAvatar?: string;
+  studentGoals?: string; // For alumni to see context at a glance
   alumniId: string;
   alumniName: string; // Denormalized
   alumniAvatar?: string;
-  message: string;
+  message: string; // Student's initial message
   status: MentorshipRequestStatus;
   requestedAt: Date;
   respondedAt?: Date;
-  studentGoals?: string; // For alumni to see context
+  alumniMessage?: string; // Optional field for alumni's direct message via the platform
 }
 
 export interface Post {
@@ -63,6 +65,7 @@ export interface Post {
 
 export interface Comment {
   id: string;
+  threadId: string; // Added to explicitly link comment to thread
   authorId: string;
   authorName: string;
   authorAvatar?: string;
@@ -74,11 +77,14 @@ export interface Comment {
 export interface DiscussionThread {
   id: string;
   title: string;
-  createdBy: string; // Alumni ID
+  createdBy: string; // User ID (typically Alumni)
   creatorName: string;
   creatorAvatar?: string;
+  creatorRole: Role; // Added to know the role of the creator
   createdAt: Date;
   lastActivityAt: Date;
   content: string; // Initial post content
-  comments: Comment[];
+  commentsCount: number; // To display comment count easily
+  // Comments are now stored in a subcollection, not directly on the thread document
 }
+

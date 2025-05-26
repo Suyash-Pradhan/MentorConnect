@@ -1,66 +1,86 @@
+
 "use client";
 
 import * as React from "react";
 import { MentorshipRequestCard } from "@/components/mentorship/mentorship-request-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { placeholderMentorshipRequests } from "@/lib/placeholders"; // Using placeholder data
-import type { MentorshipRequest, Role } from "@/types";
+import type { MentorshipRequest, Role, Profile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"; // Keep for RequestCardSkeleton
+import { getMentorshipRequestsForUser, updateMentorshipRequestStatus } from "@/services/mentorshipService";
+import { getProfile } from "@/services/profileService";
 
-// Simulate current user - replace with actual auth context
-const currentUserId = "student123"; // Can be "student123" or "alumni456" etc.
-const currentUserRole: Role = "student"; // Can be "student" or "alumni"
+// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 export default function MentorshipPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(true);
   const [requests, setRequests] = React.useState<MentorshipRequest[]>([]);
+  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
 
-  // Simulate fetching requests
   React.useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      // Filter requests based on current user's role and ID
-      const userRequests = placeholderMentorshipRequests.filter(req => 
-        (currentUserRole === 'student' && req.studentId === currentUserId) ||
-        (currentUserRole === 'alumni' && req.alumniId === currentUserId)
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      try {
+        const userProfile = await getProfile(MOCK_CURRENT_USER_ID);
+        setCurrentUserProfile(userProfile);
+        if (userProfile && userProfile.role) {
+          const fetchedRequests = await getMentorshipRequestsForUser(userProfile.id, userProfile.role);
+          setRequests(fetchedRequests);
+        } else {
+          // Handle case where profile or role is not found/set
+          setRequests([]);
+          if (!userProfile?.role) {
+             toast({ variant: "destructive", title: "Role not set", description: "Please set your role in your profile." });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching mentorship data:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not load mentorship requests." });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, [toast]);
+
+  const handleUpdateRequestStatus = async (requestId: string, newStatus: 'accepted' | 'rejected' | 'messaged', message?: string) => {
+    try {
+      await updateMentorshipRequestStatus(requestId, newStatus, message);
+      setRequests(prevRequests =>
+        prevRequests.map(req =>
+          req.id === requestId ? { ...req, status: newStatus, respondedAt: new Date(), alumniMessage: newStatus === 'messaged' ? message : req.alumniMessage } : req
+        )
       );
-      setRequests(userRequests);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
-
-  const handleUpdateRequestStatus = (requestId: string, newStatus: 'accepted' | 'rejected' | 'messaged') => {
-    // Simulate API call
-    console.log(`Updating request ${requestId} to ${newStatus}`);
-    setRequests(prevRequests =>
-      prevRequests.map(req =>
-        req.id === requestId ? { ...req, status: newStatus, respondedAt: new Date() } : req
-      )
-    );
-    toast({ title: `Request ${newStatus}`, description: `Mentorship request has been ${newStatus}.`});
-  };
-
-  const categorizeRequests = (role: Role) => {
-    if (role === 'student') {
-      return {
-        sent: requests.filter(req => req.studentId === currentUserId),
-        // Potentially 'active' or 'completed' tabs could be added
-      };
-    } else { // alumni
-      return {
-        received: requests.filter(req => req.alumniId === currentUserId && req.status === 'pending'),
-        accepted: requests.filter(req => req.alumniId === currentUserId && req.status === 'accepted'),
-        // Potentially 'completed' or 'archived'
-      };
+      toast({ title: `Request ${newStatus}`, description: `Mentorship request has been ${newStatus}.`});
+    } catch (error) {
+      console.error("Error updating request status:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not update request status." });
     }
   };
 
-  const categorized = categorizeRequests(currentUserRole);
+  const categorizeRequests = (role: Role | null) => {
+    if (!role || !currentUserProfile) return { sent: [], received: [], accepted: [] };
+    if (role === 'student') {
+      return {
+        sent: requests.filter(req => req.studentId === currentUserProfile.id),
+        received: [], // Students don't receive requests in this model
+        accepted: [], // Students see accepted status on their sent requests
+      };
+    } else { // alumni
+      return {
+        received: requests.filter(req => req.alumniId === currentUserProfile.id && req.status === 'pending'),
+        accepted: requests.filter(req => req.alumniId === currentUserProfile.id && req.status === 'accepted'),
+        sent: [], // Alumni don't send requests in this model
+      };
+    }
+  };
+  
+  const categorized = categorizeRequests(currentUserProfile?.role || null);
   
   const renderRequestList = (reqList: MentorshipRequest[], emptyMessage: string) => {
     if (isLoading) {
@@ -84,7 +104,7 @@ export default function MentorshipPage() {
           <MentorshipRequestCard
             key={request.id}
             request={request}
-            currentUserRole={currentUserRole}
+            currentUserRole={currentUserProfile?.role || 'student'} // Default to student if role is null to prevent errors, though UI might be odd.
             onUpdateRequestStatus={handleUpdateRequestStatus}
           />
         ))}
@@ -92,25 +112,47 @@ export default function MentorshipPage() {
     );
   };
 
+  if (isLoading && !currentUserProfile) {
+     return (
+      <div className="container mx-auto py-8 px-4 md:px-6">
+        <Skeleton className="h-10 w-3/4 mb-2" />
+        <Skeleton className="h-6 w-1/2 mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          {Array.from({length: 2}).map((_, i) => <RequestCardSkeleton key={i} />)}
+        </div>
+      </div>
+     )
+  }
+
+  if (!currentUserProfile?.role) {
+    return (
+      <div className="container mx-auto py-8 px-4 md:px-6 text-center">
+        <Icons.warning className="mx-auto h-16 w-16 text-destructive mb-4" />
+        <p className="text-lg text-muted-foreground">Your role is not set. Please update your profile.</p>
+        <Button asChild className="mt-4"><Link href="/profile">Go to Profile</Link></Button>
+      </div>
+    );
+  }
+
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-foreground">Mentorship Dashboard</h1>
         <p className="text-lg text-muted-foreground">
-          {currentUserRole === 'student'
+          {currentUserProfile?.role === 'student'
             ? "Manage your mentorship requests sent to alumni."
             : "Manage mentorship requests received from students."}
         </p>
       </div>
 
-      {currentUserRole === 'student' && (
+      {currentUserProfile?.role === 'student' && (
         <Tabs defaultValue="sent" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:w-1/2 lg:w-1/3">
             <TabsTrigger value="sent">
                 Sent Requests 
                 {!isLoading && categorized.sent && <Badge variant="secondary" className="ml-2">{categorized.sent.length}</Badge>}
             </TabsTrigger>
-            {/* Add more tabs for student if needed, e.g., "Active", "Completed" */}
              <TabsTrigger value="active" disabled>Active Mentorships</TabsTrigger>
           </TabsList>
           <TabsContent value="sent">
@@ -122,7 +164,7 @@ export default function MentorshipPage() {
         </Tabs>
       )}
 
-      {currentUserRole === 'alumni' && (
+      {currentUserProfile?.role === 'alumni' && (
         <Tabs defaultValue="received" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:w-1/2 lg:w-1/3">
             <TabsTrigger value="received">
@@ -145,7 +187,6 @@ export default function MentorshipPage() {
     </div>
   );
 }
-
 
 const RequestCardSkeleton = () => (
   <Card className="shadow-sm">
@@ -172,4 +213,3 @@ const RequestCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
-

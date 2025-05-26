@@ -8,6 +8,8 @@ import type { Profile, MentorshipRequest } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button"; // Added missing import
+import Link from "next/link"; // Added missing import
 import { getProfilesByRole, getProfile } from "@/services/profileService";
 import { createMentorshipRequest } from "@/services/mentorshipService";
 

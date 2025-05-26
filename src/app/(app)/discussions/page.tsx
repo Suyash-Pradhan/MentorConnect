@@ -80,7 +80,7 @@ export default function DiscussionsPage() {
       toast({ variant: "destructive", title: "Permission Denied", description: "Only alumni can create new discussion threads." });
       return;
     }
-    form.formState.isSubmitting; // to mark as used
+    
     try {
       const newThreadData: Omit<DiscussionThread, 'id' | 'createdAt' | 'lastActivityAt' | 'commentsCount'> = {
         title: values.title,
@@ -271,4 +271,3 @@ const ThreadCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
-

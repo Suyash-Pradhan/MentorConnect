@@ -9,7 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"; // Keep for RequestCardSkeleton
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"; 
+import { Button } from "@/components/ui/button"; // Added missing import
+import Link from "next/link"; // Added missing import
 import { getMentorshipRequestsForUser, updateMentorshipRequestStatus } from "@/services/mentorshipService";
 import { getProfile } from "@/services/profileService";
 

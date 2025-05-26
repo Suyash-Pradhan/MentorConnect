@@ -77,7 +77,7 @@ export default function SingleDiscussionPage() {
       toast({ variant: "destructive", title: "Error", description: "You must be logged in to comment or thread is missing." });
       return;
     }
-    form.formState.isSubmitting; // mark as used
+    
     try {
       const newCommentData: Omit<ThreadCommentType, 'id' | 'createdAt'> = {
         threadId: thread.id,

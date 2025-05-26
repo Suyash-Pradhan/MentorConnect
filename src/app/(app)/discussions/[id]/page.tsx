@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter }g from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { placeholderThreads, placeholderComments, placeholderUserStudent, placeholderUserAlumni } from "@/lib/placeholders"; // Using placeholder data
 import type { DiscussionThread, Comment as ThreadComment, Role } from "@/types"; // Renamed to avoid conflict with React.Comment

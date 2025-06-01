@@ -4,15 +4,16 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image"; // Import next/image
 import type { Post } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"; // Removed CardDescription as it was not explicitly used here for a distinct purpose.
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getPostById } from "@/services/postService"; // Import the service
+import { getPostById } from "@/services/postService";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SinglePostPage() {
@@ -27,7 +28,7 @@ export default function SinglePostPage() {
     const fetchPost = async () => {
       if (!postId) {
         setIsLoading(false);
-        setPost(null); // No ID, so no post
+        setPost(null);
         return;
       }
       setIsLoading(true);
@@ -41,7 +42,7 @@ export default function SinglePostPage() {
           title: "Error",
           description: "Could not load the post. Please try again later.",
         });
-        setPost(null); // Set to null on error
+        setPost(null);
       } finally {
         setIsLoading(false);
       }
@@ -50,7 +51,7 @@ export default function SinglePostPage() {
     fetchPost();
   }, [postId, toast]);
 
-  if (isLoading || post === undefined) { // Show skeleton if loading or post is undefined (initial state)
+  if (isLoading || post === undefined) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6">
         <div className="mb-8">
@@ -65,9 +66,10 @@ export default function SinglePostPage() {
                 <Skeleton className="h-4 w-32" />
               </div>
             </div>
-            <Skeleton className="h-8 w-3/4 !mt-6" /> {/* Title */}
-            <Skeleton className="h-6 w-24 rounded-full" /> {/* Badge */}
+            <Skeleton className="h-8 w-3/4 !mt-6" />
+            <Skeleton className="h-6 w-24 rounded-full" />
           </CardHeader>
+          <Skeleton className="h-72 w-full mt-4" /> {/* Image Placeholder */}
           <CardContent className="space-y-4 py-6 p-6 md:p-8">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-full" />
@@ -83,7 +85,7 @@ export default function SinglePostPage() {
     );
   }
 
-  if (!post) { // Post is null (not found or error)
+  if (!post) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6 text-center">
         <Button variant="outline" asChild className="mb-8 inline-flex items-center">
@@ -93,7 +95,7 @@ export default function SinglePostPage() {
           <Icons.post className="mx-auto h-24 w-24 text-muted-foreground mb-6" />
           <h1 className="text-3xl font-bold text-destructive mb-3">Post Not Found</h1>
           <p className="text-lg text-muted-foreground">
-            Sorry, we couldn&apos;t find the post you were looking for. It might have been removed or the link is incorrect.
+            Sorry, we couldn&apos;t find the post you were looking for.
           </p>
         </div>
       </div>
@@ -127,22 +129,55 @@ export default function SinglePostPage() {
             <Badge variant="secondary" className="w-fit text-sm py-1 px-3">{post.category}</Badge>
           </CardHeader>
 
+          {post.imageUrl && (
+            <div className="relative w-full h-72 md:h-96 my-4">
+              <Image src={post.imageUrl} alt={post.title} layout="fill" objectFit="contain" data-ai-hint="post image content"/>
+            </div>
+          )}
+
           <CardContent className="p-6 md:p-8 text-foreground/90 text-base md:text-lg leading-relaxed">
             <div className="whitespace-pre-wrap">
                 {post.content}
             </div>
+            {post.videoUrl && (
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">Video:</h3>
+                    <a href={post.videoUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2">
+                        <Icons.link className="h-4 w-4" /> {post.videoUrl}
+                    </a>
+                    {/* Basic video embed could be added here later for known sources like YouTube */}
+                </div>
+            )}
+            {post.externalLinkUrl && (
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold text-muted-foreground mb-2">External Link:</h3>
+                    <a href={post.externalLinkUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2">
+                        <Icons.link className="h-4 w-4" /> {post.externalLinkText || post.externalLinkUrl}
+                    </a>
+                </div>
+            )}
           </CardContent>
 
-          {post.tags && post.tags.length > 0 && (
-            <CardFooter className="border-t p-6 md:p-8 flex flex-col items-start gap-3">
-               <h3 className="text-md font-semibold text-muted-foreground">TAGS:</h3>
-              <div className="flex flex-wrap gap-2">
-                {post.tags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-sm">{tag}</Badge>
-                ))}
-              </div>
-            </CardFooter>
-          )}
+          <CardFooter className="border-t p-6 md:p-8 flex flex-col items-start gap-4">
+             <div className="flex items-center gap-6 text-muted-foreground">
+                <Button variant="ghost" size="lg" className="p-1 h-auto hover:text-primary text-base">
+                    <Icons.thumbsUp className="mr-2 h-5 w-5" /> {post.likesCount} Likes
+                </Button>
+                <Button variant="ghost" size="lg" className="p-1 h-auto hover:text-primary text-base">
+                    <Icons.discussions className="mr-2 h-5 w-5" /> {post.commentsCount} Comments
+                </Button>
+            </div>
+            {post.tags && post.tags.length > 0 && (
+                <div className="mt-2">
+                    <h3 className="text-md font-semibold text-muted-foreground mb-1">TAGS:</h3>
+                    <div className="flex flex-wrap gap-2">
+                        {post.tags.map(tag => (
+                        <Badge key={tag} variant="outline" className="text-sm">{tag}</Badge>
+                        ))}
+                    </div>
+                </div>
+            )}
+          </CardFooter>
         </Card>
       </article>
     </div>

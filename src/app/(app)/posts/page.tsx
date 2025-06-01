@@ -2,22 +2,24 @@
 "use client";
 
 import React from 'react';
-import type { Post } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
+import type { Post, Profile } from '@/types'; // Added Profile
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import Image from 'next/image'; // Import next/image
 import { formatDistanceToNow } from 'date-fns';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getAllPosts } from '@/services/postService'; // Import the service
+import { getAllPosts } from '@/services/postService';
+import { getProfile } from '@/services/profileService'; // Added
 import { useToast } from '@/hooks/use-toast';
 
-// Simulate current user role - replace with actual auth context
-const currentUserRole: 'student' | 'alumni' = 'student'; // Example, would come from auth context
+// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
+const MOCK_CURRENT_USER_ID = "user123_dev"; // Can be "student123" or "alumni456"
 
 const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 
@@ -27,25 +29,30 @@ export default function PostsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
+  const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
 
   React.useEffect(() => {
-    const fetchPosts = async () => {
+    const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        const postsData = await getAllPosts();
+        const [postsData, userProfile] = await Promise.all([
+          getAllPosts(),
+          getProfile(MOCK_CURRENT_USER_ID) // Fetch current user
+        ]);
         setAllPosts(postsData);
+        setCurrentUser(userProfile);
       } catch (error) {
-        console.error("Failed to fetch posts:", error);
+        console.error("Failed to fetch initial data:", error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not load posts. Please try again later.",
+          description: "Could not load posts or user data. Please try again later.",
         });
       } finally {
         setIsLoading(false);
       }
     };
-    fetchPosts();
+    fetchInitialData();
   }, [toast]);
 
   const filteredPosts = allPosts
@@ -65,7 +72,7 @@ export default function PostsPage() {
                 <Skeleton className="h-10 w-48 mb-2" />
                 <Skeleton className="h-5 w-72" />
             </div>
-            {currentUserRole === 'alumni' && <Skeleton className="h-10 w-36" />}
+            <Skeleton className="h-10 w-36" /> {/* Placeholder for create button */}
         </div>
         <Card className="mb-6 p-4 shadow-sm bg-secondary">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -87,9 +94,9 @@ export default function PostsPage() {
           <h1 className="text-4xl font-bold text-foreground">Alumni Posts</h1>
           <p className="text-lg text-muted-foreground">Guidance, job openings, and success stories from our alumni.</p>
         </div>
-        {currentUserRole === 'alumni' && (
+        {currentUser?.role === 'alumni' && (
           <Button asChild>
-            <Link href="/posts/create"> {/* TODO: Create this page */}
+            <Link href="/posts/create">
               <Icons.add className="mr-2 h-4 w-4" /> Create New Post
             </Link>
           </Button>
@@ -152,7 +159,7 @@ function PostCard({ post }: { post: Post }) {
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={post.authorAvatar || `https://placehold.co/40x40.png`} alt={post.authorName} data-ai-hint="person professional"/>
             <AvatarFallback>{post.authorName ? post.authorName.charAt(0).toUpperCase() : 'A'}</AvatarFallback>
@@ -169,16 +176,50 @@ function PostCard({ post }: { post: Post }) {
         </CardTitle>
         <Badge variant="outline" className="w-fit">{post.category}</Badge>
       </CardHeader>
-      <CardContent className="flex-grow">
-        <p className="text-muted-foreground line-clamp-4">{post.content}</p>
-      </CardContent>
-      <CardFooter className="flex flex-col items-start gap-2 border-t pt-4">
-        <div className="flex flex-wrap gap-1">
-          {post.tags.map(tag => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+      
+      {post.imageUrl && (
+        <div className="relative w-full h-48 overflow-hidden">
+          <Image src={post.imageUrl} alt={post.title} layout="fill" objectFit="cover" data-ai-hint="post image"/>
         </div>
-         <Button variant="link" asChild className="p-0 h-auto text-primary self-end">
-          <Link href={`/posts/${post.id}`}>Read More <Icons.arrowRight className="ml-1 h-4 w-4" /></Link>
-        </Button>
+      )}
+
+      <CardContent className="flex-grow pt-4">
+        <p className="text-muted-foreground line-clamp-3">{post.content}</p>
+        {post.videoUrl && (
+            <div className="mt-2">
+                <a href={post.videoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                    <Icons.link className="h-3 w-3" /> Watch Video
+                </a>
+            </div>
+        )}
+        {post.externalLinkUrl && (
+            <div className="mt-2">
+                 <a href={post.externalLinkUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                    <Icons.link className="h-3 w-3" /> {post.externalLinkText || "View Link"}
+                </a>
+            </div>
+        )}
+      </CardContent>
+      
+      <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
+        <div className="flex justify-between w-full items-center">
+            <div className="flex items-center gap-4 text-muted-foreground">
+                <Button variant="ghost" size="sm" className="p-1 h-auto hover:text-primary">
+                    <Icons.thumbsUp className="mr-1.5 h-4 w-4" /> {post.likesCount}
+                </Button>
+                <Button variant="ghost" size="sm" className="p-1 h-auto hover:text-primary">
+                    <Icons.discussions className="mr-1.5 h-4 w-4" /> {post.commentsCount}
+                </Button>
+            </div>
+             <Button variant="link" asChild className="p-0 h-auto text-primary self-end">
+                <Link href={`/posts/${post.id}`}>Read More <Icons.arrowRight className="ml-1 h-4 w-4" /></Link>
+            </Button>
+        </div>
+        {post.tags && post.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-2 w-full">
+            {post.tags.map(tag => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
@@ -197,18 +238,24 @@ const PostCardSkeleton = () => (
       <Skeleton className="h-6 w-3/4 mb-1" />
       <Skeleton className="h-5 w-20 rounded-full" />
     </CardHeader>
-    <CardContent className="flex-grow space-y-2">
+    <Skeleton className="h-48 w-full" /> {/* For Image */}
+    <CardContent className="flex-grow space-y-2 pt-4">
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-2/3" />
     </CardContent>
     <CardFooter className="flex flex-col items-start gap-2 border-t pt-4">
-      <div className="flex flex-wrap gap-1">
+       <div className="flex justify-between w-full items-center">
+            <div className="flex items-center gap-4">
+                <Skeleton className="h-6 w-12" />
+                <Skeleton className="h-6 w-12" />
+            </div>
+            <Skeleton className="h-5 w-24 self-end" />
+        </div>
+      <div className="flex flex-wrap gap-1 pt-2">
         <Skeleton className="h-5 w-16 rounded-full" />
         <Skeleton className="h-5 w-20 rounded-full" />
       </div>
-      <Skeleton className="h-5 w-24 self-end" />
     </CardFooter>
   </Card>
 );
-

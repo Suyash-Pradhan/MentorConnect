@@ -24,7 +24,7 @@ export interface AlumniProfile {
   experienceYears: number;
   education: string; // e.g., "B.Tech in CSE from XYZ College"
   industry: string;
-  linkedinUrl?: string; // Added LinkedIn URL
+  linkedinUrl?: string;
 }
 
 export interface Profile extends User {
@@ -59,8 +59,14 @@ export interface Post {
   content: string;
   tags: string[];
   category: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  externalLinkUrl?: string;
+  externalLinkText?: string;
+  likesCount: number;
+  commentsCount: number;
   createdAt: Date;
-  updatedAt?: Date; // Added for tracking updates
+  updatedAt?: Date;
 }
 
 export interface Comment {
@@ -85,5 +91,4 @@ export interface DiscussionThread {
   lastActivityAt: Date;
   content: string; // Initial post content
   commentsCount: number; // To display comment count easily
-  // Comments are now stored in a subcollection, not directly on the thread document
 }

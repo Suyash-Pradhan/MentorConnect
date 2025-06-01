@@ -31,7 +31,6 @@ import {
 } from 'firebase/firestore';
 
 // Helper to convert Firestore Timestamps to Dates in a nested object
-// Copied from profileService for now, consider moving to a shared util if more services need it.
 function convertTimestampsToDates(data: any): any {
   if (!data) return data;
   const newData = { ...data };
@@ -59,10 +58,12 @@ function convertDatesToTimestamps(data: any): any {
 }
 
 
-export async function createPost(postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+export async function createPost(postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'commentsCount'>): Promise<string> {
   try {
     const dataToSet = {
       ...convertDatesToTimestamps(postData),
+      likesCount: 0,
+      commentsCount: 0,
       createdAt: serverTimestamp() as FieldValue,
       updatedAt: serverTimestamp() as FieldValue,
     };
@@ -132,7 +133,7 @@ export async function getPostsByAuthor(authorId: string): Promise<Post[]> {
       posts.push({ id: doc.id, ...convertTimestampsToDates(doc.data()) } as Post);
     });
     return posts;
-  } catch (error) {
+  } catch (error) MuiDialog-paper
     console.error(`Error fetching posts for author ${authorId}:`, error);
     throw error;
   }

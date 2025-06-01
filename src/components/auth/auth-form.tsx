@@ -58,21 +58,19 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
   const onSubmit = async (data: UserFormValue) => {
     setIsLoading(true);
     try {
-      // Set auth persistence to local, so user stays signed in.
       await setPersistence(auth, browserLocalPersistence);
 
       if (isSignUp) {
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
 
-        // Create a profile in Firestore for the new user
         const newProfile: Profile = {
           id: firebaseUser.uid,
-          email: firebaseUser.email || data.email, // Use email from auth if available
-          role: null, // Role will be set on the role-selection page
-          name: "", // Name can be set later in profile edit
+          email: firebaseUser.email || data.email, // Use actual email from auth
+          role: null, 
+          name: firebaseUser.displayName || "", // Use display name from auth if available, else empty
           avatarUrl: firebaseUser.photoURL || "",
-          createdAt: new Date(), // profileService handles serverTimestamp for new docs
+          createdAt: new Date(), 
         };
         await setProfile(firebaseUser.uid, newProfile);
 
@@ -85,7 +83,6 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
 
-        // Fetch profile to check if role is selected
         const userProfile = await getProfile(firebaseUser.uid);
 
         if (userProfile && userProfile.role) {
@@ -93,18 +90,22 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             title: "Login Successful!",
             description: "Welcome back to MentorConnect.",
           });
-          router.push("/dashboard");
+          // If name is missing even after login and role is set, guide to profile to complete it.
+          if (!userProfile.name) {
+            router.push("/profile?edit=true"); // Add a query param to suggest opening edit
+          } else {
+            router.push("/dashboard");
+          }
         } else {
-          // If profile doesn't exist or role is not set, go to role selection
           toast({
             title: "Login Successful!",
             description: "Please select your role to continue.",
           });
-           // Ensure profile exists even if role is null (e.g. if signup failed to create one somehow)
            if (!userProfile) {
              const profileToEnsure: Profile = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || data.email,
+                name: firebaseUser.displayName || "",
                 role: null,
                 createdAt: new Date(),
              };

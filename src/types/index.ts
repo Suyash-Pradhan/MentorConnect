@@ -1,5 +1,4 @@
 
-
 export type Role = 'student' | 'alumni' | 'admin';
 
 export interface User {
@@ -25,6 +24,7 @@ export interface AlumniProfile {
   experienceYears: number;
   education: string; // e.g., "B.Tech in CSE from XYZ College"
   industry: string;
+  linkedinUrl?: string; // Added LinkedIn URL
 }
 
 export interface Profile extends User {
@@ -87,4 +87,3 @@ export interface DiscussionThread {
   commentsCount: number; // To display comment count easily
   // Comments are now stored in a subcollection, not directly on the thread document
 }
-

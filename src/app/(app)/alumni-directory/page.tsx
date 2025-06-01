@@ -4,17 +4,16 @@
 import * as React from "react";
 import { AlumniCard } from "@/components/alumni/alumni-card";
 import { AlumniFilters, type AlumniFiltersState } from "@/components/alumni/alumni-filters";
-import type { Profile, MentorshipRequest } from "@/types";
+import type { Profile, MentorshipRequest, Role } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button"; // Added missing import
-import Link from "next/link"; // Added missing import
+import { Button } from "@/components/ui/button"; 
+import Link from "next/link"; 
 import { getProfilesByRole, getProfile } from "@/services/profileService";
 import { createMentorshipRequest } from "@/services/mentorshipService";
 
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // This should be a student ID for this page
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 export default function AlumniDirectoryPage() {
   const { toast } = useToast();
@@ -29,7 +28,7 @@ export default function AlumniDirectoryPage() {
       try {
         const [alumniData, userProfile] = await Promise.all([
           getProfilesByRole('alumni'),
-          getProfile(MOCK_CURRENT_USER_ID) // Fetch current student's profile
+          getProfile(MOCK_CURRENT_USER_ID) 
         ]);
         setAllAlumni(alumniData);
         setFilteredAlumni(alumniData);
@@ -125,7 +124,7 @@ export default function AlumniDirectoryPage() {
     return Array.from(industriesSet).sort();
   }, [allAlumni]);
 
-  if (isLoading && !currentUserProfile) {
+  if (isLoading) { // Show skeleton if page data or user profile is loading
      return (
         <div className="container mx-auto py-8 px-4 md:px-6">
             <div className="mb-8 text-center">
@@ -142,22 +141,20 @@ export default function AlumniDirectoryPage() {
      );
   }
   
-  if (currentUserProfile && currentUserProfile.role !== 'student') {
-    return (
-      <div className="container mx-auto py-8 px-4 md:px-6 text-center">
-        <Icons.warning className="mx-auto h-16 w-16 text-destructive mb-4" />
-        <p className="text-lg text-muted-foreground">Alumni Directory is only available for students.</p>
-        <Button asChild className="mt-4"><Link href="/dashboard">Go to Dashboard</Link></Button>
-      </div>
-    );
-  }
+  // The page is now accessible to all authenticated users.
+  // Specific functionalities like "Request Mentorship" will be controlled at the AlumniCard component level.
+
+  const alumniCount = filteredAlumni.length;
+  const subtitleText = currentUserProfile?.role === 'student' 
+    ? `Browse ${alumniCount} alumni. Connect for mentorship & view LinkedIn profiles.`
+    : `Browse ${alumniCount} alumni. View profiles and LinkedIn details.`;
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-foreground mb-2">Alumni Directory</h1>
         <p className="text-lg text-muted-foreground">
-          Find and connect with experienced alumni for guidance and mentorship.
+          {isLoading ? 'Loading alumni...' : subtitleText}
         </p>
       </div>
 
@@ -167,16 +164,15 @@ export default function AlumniDirectoryPage() {
         availableIndustries={availableIndustries}
       />
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <CardSkeleton key={index} />
-          ))}
-        </div>
-      ) : filteredAlumni.length > 0 ? (
+      {filteredAlumni.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredAlumni.map((alumni) => (
-            <AlumniCard key={alumni.id} alumni={alumni} onMentorshipRequest={(message) => handleMentorshipRequest(alumni, message)} />
+            <AlumniCard 
+              key={alumni.id} 
+              alumni={alumni} 
+              currentUserRole={currentUserProfile?.role} // Pass current user's role
+              onMentorshipRequest={(message) => handleMentorshipRequest(alumni, message)} 
+            />
           ))}
         </div>
       ) : (

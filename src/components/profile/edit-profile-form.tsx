@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -24,24 +25,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const commonProfileSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }).max(50),
-  // email: z.string().email(), // Email is usually not editable or handled separately
-  avatarUrl: z.string().url().optional().or(z.literal("")),
+  avatarUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal("")),
 });
 
 const studentProfileSchema = commonProfileSchema.extend({
   college: z.string().min(3, "College name is required."),
   year: z.coerce.number().min(1, "Year must be a positive number.").max(8),
-  academicInterests: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)), // comma-separated string to array
+  academicInterests: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)), 
   goals: z.string().min(10, "Goals must be at least 10 characters.").max(500),
 });
 
 const alumniProfileSchema = commonProfileSchema.extend({
   jobTitle: z.string().min(2, "Job title is required."),
   company: z.string().min(2, "Company name is required."),
-  skills: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)), // comma-separated string to array
+  skills: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)), 
   experienceYears: z.coerce.number().min(0, "Experience cannot be negative.").max(50),
   education: z.string().min(5, "Education details are required."),
   industry: z.string().min(2, "Industry is required."),
+  linkedinUrl: z.string().url({ message: "Please enter a valid LinkedIn URL." }).optional().or(z.literal("")),
 });
 
 type EditProfileFormValues = z.infer<typeof commonProfileSchema> & 
@@ -51,7 +52,7 @@ type EditProfileFormValues = z.infer<typeof commonProfileSchema> &
 
 interface EditProfileFormProps {
   profile: Profile;
-  onSave: (data: EditProfileFormValues) => Promise<void>; // Simulate save
+  onSave: (data: EditProfileFormValues) => Promise<void>; 
   onCancel: () => void;
 }
 
@@ -73,6 +74,7 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
       ...(profile.role === 'alumni' && profile.alumniProfile ? {
         ...profile.alumniProfile,
         skills: profile.alumniProfile.skills.join(', '),
+        linkedinUrl: profile.alumniProfile.linkedinUrl || "",
       } : {}),
     },
   });
@@ -80,7 +82,6 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
   const onSubmit = async (data: EditProfileFormValues) => {
     setIsLoading(true);
     try {
-      // Transform comma-separated strings back to arrays for specific fields
       const saveData = { ...data };
       if (profile.role === 'student' && typeof data.academicInterests === 'string') {
         saveData.academicInterests = data.academicInterests.split(',').map(s => s.trim()).filter(Boolean);
@@ -89,7 +90,7 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
         saveData.skills = data.skills.split(',').map(s => s.trim()).filter(Boolean);
       }
       
-      await onSave(saveData); // Call the passed onSave function
+      await onSave(saveData); 
       toast({ title: "Profile Updated", description: "Your profile has been successfully updated." });
     } catch (error) {
       toast({ variant: "destructive", title: "Update Failed", description: "Could not update profile. Please try again." });
@@ -132,7 +133,6 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
                 )}
                 />
 
-                {/* Student Specific Fields */}
                 {profile.role === 'student' && (
                 <>
                     <FormField
@@ -191,7 +191,6 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
                 </>
                 )}
 
-                {/* Alumni Specific Fields */}
                 {profile.role === 'alumni' && (
                 <>
                     <FormField
@@ -268,6 +267,19 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
                         <FormLabel>Industry</FormLabel>
                         <FormControl>
                             <Input placeholder="e.g., Technology, Finance" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="linkedinUrl"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>LinkedIn Profile URL</FormLabel>
+                        <FormControl>
+                            <Input placeholder="https://linkedin.com/in/yourprofile" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>

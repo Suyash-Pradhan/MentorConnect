@@ -1,13 +1,12 @@
 
 "use client";
 
-import type { Profile } from "@/types";
+import type { Profile, Role } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
-// Link import removed as it's not used
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -21,14 +20,15 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import React from "react";
-import { ViewProfile } from "../profile/view-profile"; // For detailed view
+import { ViewProfile } from "../profile/view-profile"; 
 
 interface AlumniCardProps {
   alumni: Profile; 
-  onMentorshipRequest: (message: string) => void; // Simplified: expects only message, alumni passed in parent
+  currentUserRole?: Role | null; // Added to control mentorship button
+  onMentorshipRequest: (message: string) => void; 
 }
 
-export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
+export function AlumniCard({ alumni, currentUserRole, onMentorshipRequest }: AlumniCardProps) {
   const { toast } = useToast();
   const [message, setMessage] = React.useState("");
   const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
@@ -46,7 +46,7 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
       toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
       return;
     }
-    onMentorshipRequest(message); // Pass only message
+    onMentorshipRequest(message); 
     setIsRequestDialogOpen(false);
     setMessage(""); 
   };
@@ -78,12 +78,25 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
             {alumniProfile.skills.length > 3 && <Badge variant="outline">+{alumniProfile.skills.length - 3} more</Badge>}
           </div>
         </div>
+         {alumniProfile.linkedinUrl && (
+          <div className="mt-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1">Connect</h4>
+            <a 
+              href={alumniProfile.linkedinUrl.startsWith('http') ? alumniProfile.linkedinUrl : `https://${alumniProfile.linkedinUrl}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              <Icons.link className="h-3 w-3" /> LinkedIn
+            </a>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="p-4 border-t flex flex-col sm:flex-row gap-2">
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="w-full sm:w-auto flex-1">
-              <Icons.profile className="mr-2 h-4 w-4" /> View Profile
+              <Icons.profile className="mr-2 h-4 w-4" /> View Full Profile
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -99,35 +112,37 @@ export function AlumniCard({ alumni, onMentorshipRequest }: AlumniCardProps) {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto flex-1">
-              <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Request Mentorship from {name}</DialogTitle>
-              <DialogDescription>
-                Send a personalized message to {name} explaining why you&apos;d like their mentorship.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <Textarea
-                placeholder="Hi, I'm interested in your expertise in..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button type="button" onClick={handleRequestSubmit}>Send Request</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {currentUserRole === 'student' && (
+          <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto flex-1">
+                <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Request Mentorship from {name}</DialogTitle>
+                <DialogDescription>
+                  Send a personalized message to {name} explaining why you&apos;d like their mentorship.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <Textarea
+                  placeholder="Hi, I'm interested in your expertise in..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={4}
+                />
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="button" onClick={handleRequestSubmit}>Send Request</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </CardFooter>
     </Card>
   );

@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Profile, StudentProfile, AlumniProfile } from "@/types";
@@ -8,25 +9,39 @@ import { Icons } from "@/components/icons";
 import Image from "next/image";
 
 interface ViewProfileProps {
-  profile: Profile; // Combined profile data
+  profile: Profile; 
 }
 
-const ProfileInfoItem: React.FC<{ icon: React.ElementType; label: string; value?: string | number | string[] | null }> = ({ icon: Icon, label, value }) => {
+const ProfileInfoItem: React.FC<{ icon: React.ElementType; label: string; value?: string | number | string[] | null; isLink?: boolean; linkPrefix?: string }> = ({ icon: Icon, label, value, isLink = false, linkPrefix = '' }) => {
   if (!value || (Array.isArray(value) && value.length === 0)) return null;
+  
+  let displayValue: React.ReactNode = null;
+
+  if (isLink && typeof value === 'string') {
+    const href = value.startsWith('http://') || value.startsWith('https://') ? value : `${linkPrefix}${value}`;
+    displayValue = (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+        {value}
+      </a>
+    );
+  } else if (Array.isArray(value)) {
+    displayValue = (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {value.map((item, index) => (
+          <Badge key={index} variant="secondary" className="text-sm">{item}</Badge>
+        ))}
+      </div>
+    );
+  } else {
+    displayValue = <p className="text-md text-foreground">{String(value)}</p>;
+  }
+
   return (
     <div className="flex items-start space-x-3 py-2">
       <Icon className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
       <div>
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        {Array.isArray(value) ? (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {value.map((item, index) => (
-              <Badge key={index} variant="secondary" className="text-sm">{item}</Badge>
-            ))}
-          </div>
-        ) : (
-          <p className="text-md text-foreground">{value}</p>
-        )}
+        {displayValue}
       </div>
     </div>
   );
@@ -54,7 +69,7 @@ export function ViewProfile({ profile }: ViewProfileProps) {
         </div>
       </div>
       
-      <CardHeader className="text-center mt-16 pt-8"> {/* Added mt-16 for avatar overlap */}
+      <CardHeader className="text-center mt-16 pt-8"> 
         <CardTitle className="text-3xl">{profile.name || "User Name"}</CardTitle>
         <CardDescription className="text-md text-muted-foreground">{profile.email}</CardDescription>
         <Badge variant="outline" className="mx-auto mt-2 text-md capitalize">{profile.role}</Badge>
@@ -83,6 +98,7 @@ export function ViewProfile({ profile }: ViewProfileProps) {
               <ProfileInfoItem icon={Icons.calendar} label="Years of Experience" value={profile.alumniProfile.experienceYears?.toString()} />
               <ProfileInfoItem icon={Icons.logo} label="Education" value={profile.alumniProfile.education} />
               <ProfileInfoItem icon={Icons.filter} label="Industry" value={profile.alumniProfile.industry} />
+              <ProfileInfoItem icon={Icons.link} label="LinkedIn Profile" value={profile.alumniProfile.linkedinUrl} isLink linkPrefix="https://" />
             </div>
           </section>
         )}

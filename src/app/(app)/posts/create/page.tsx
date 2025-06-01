@@ -19,7 +19,7 @@ import { getProfile } from "@/services/profileService"; // To get current user f
 import { Skeleton } from "@/components/ui/skeleton";
 
 // MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "alumni456"; // Assuming an alumni user for testing create post
+const MOCK_CURRENT_USER_ID = "user123_dev"; // Changed from "alumni456" to align with global mock
 
 const postFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100),

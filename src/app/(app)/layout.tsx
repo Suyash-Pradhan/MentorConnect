@@ -35,41 +35,38 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     console.error("AppLayout: Failed to fetch user profile:", error);
     profileError = true;
     
-    const baseErrorMessage = `**Critical Error Connecting to Firebase/Firestore**
-    Your application is configured to use Firebase Project ID: **${configuredProjectId}**.
-    The error received is: **${error.message || 'Unknown error'}** (Code: ${error.code || 'N/A'})
+    let specificGuidance = "";
+    if (error.code && (error.code.includes("permission-denied") || error.code === 'PERMISSION_DENIED' || (error.message && error.message.toLowerCase().includes("firestore api has not been used")))) {
+      specificGuidance = `
+      This **"PERMISSION_DENIED"** error means the Cloud Firestore API is not enabled for your Firebase project **${configuredProjectId}**, or there's a mismatch with the project you're configuring.
 
-    **This usually means there's a configuration problem with your Firebase project itself, external to this application's code.**`;
-
-    if (error.code && (error.code.includes("permission-denied") || error.code === 'PERMISSION_DENIED')) {
-      profileErrorMessage = `${baseErrorMessage}
-
-      **Action Required: Enable Cloud Firestore API**
-      1.  **VERIFY GOOGLE ACCOUNT**: Ensure you are logged into the Google Cloud Console with the **EXACT Google account that owns or has Editor permissions on the Firebase project \`${configuredProjectId}\`**.
+      **Action Required (Ensure you are logged into the CORRECT Google Account for project ${configuredProjectId}):**
+      1.  **VERIFY GOOGLE ACCOUNT**: Double-check you are logged into Google Cloud & Firebase consoles with the account that OWNS or has EDITOR permissions on project \`${configuredProjectId}\`.
       2.  **ENABLE API**: Go to: [https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId}](https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId})
           *   If it shows an "Enable" button, **CLICK IT**.
-      3.  **CREATE DATABASE**: In the Firebase Console for project \`${configuredProjectId}\` ([https://console.firebase.google.com/project/${configuredProjectId}/firestore](https://console.firebase.google.com/project/${configuredProjectId}/firestore)), ensure a Firestore database instance has been **CREATED**. If you see "Create database", click it and follow the prompts.
-      4.  **WAIT**: After enabling/creating, wait 10-20 minutes for changes to propagate.
+      3.  **CREATE DATABASE**: In the Firebase Console for project \`${configuredProjectId}\` ([https://console.firebase.google.com/project/${configuredProjectId}/firestore](https://console.firebase.google.com/project/${configuredProjectId}/firestore)), ensure a Firestore database instance has been **CREATED**. If you see "Create database", click it and follow the prompts (select region, start in "test mode").
+      4.  **WAIT**: After enabling/creating, **WAIT 10-20 minutes** for changes to propagate.
       5.  **RESTART SERVER**: Stop and restart your Next.js development server.
-      6.  **PROJECT ID MISMATCH?**: If you are actively working in a *different* Firebase project in your console, ensure the Project ID above (\`${configuredProjectId}\`) from your app's \`.env.local\` file matches the Project ID you are configuring. If they don't match, update your \`.env.local\` file with the correct Firebase configuration for the project you intend to use.`;
+      6.  **PROJECT ID CHECK**: Ensure \`NEXT_PUBLIC_FIREBASE_PROJECT_ID\` in your \`.env.local\` file **exactly matches** \`${configuredProjectId}\`. If it says "PROJECT_ID_NOT_CONFIGURED_IN_ENV" above, your .env.local file is not being read correctly or the variable is missing.`;
     } else if (error.code && (error.code.includes("unavailable") || error.code === 'UNAVAILABLE' || (error.message && error.message.toLowerCase().includes("offline")))) {
-        profileErrorMessage = `${baseErrorMessage}
+        specificGuidance = `
+        This **"offline" or "unavailable"** error suggests the Firestore service was recently enabled/created and needs more time, or there's a network issue.
 
-        **Action Required: Check Firestore & Network**
-        This "offline" or "unavailable" error often occurs if:
-        1.  The Cloud Firestore API was recently enabled or the database was just created for project \`${configuredProjectId}\`. Please **wait 10-20 minutes** for Google's systems to fully update.
-        2.  Your Next.js server environment has lost internet connectivity or cannot reach Google Cloud services.
-        3.  The Firestore database instance for project \`${configuredProjectId}\` was not fully created/initialized. Verify this in the Firebase Console ([https://console.firebase.google.com/project/${configuredProjectId}/firestore](https://console.firebase.google.com/project/${configuredProjectId}/firestore)).
-        4.  **After waiting/verifying, restart your Next.js development server.**
-        5.  **PROJECT ID MISMATCH?**: Ensure the Project ID above (\`${configuredProjectId}\`) from your app's \`.env.local\` file matches the Project ID you are configuring in the Firebase/Google Cloud Console. If they differ, your app is trying to connect to the wrong project. Update \`.env.local\` accordingly.`;
+        **Action Required:**
+        1.  If you recently enabled the Firestore API or created the database for project \`${configuredProjectId}\`, please **WAIT 15-30 minutes** for Google's systems to fully update.
+        2.  Ensure your Next.js server environment has stable internet connectivity.
+        3.  Verify the Firestore database instance for project \`${configuredProjectId}\` was fully created/initialized in the Firebase Console.
+        4.  **After waiting/verifying, RESTART your Next.js development server.**
+        5.  **PROJECT ID CHECK**: Ensure \`NEXT_PUBLIC_FIREBASE_PROJECT_ID\` in your \`.env.local\` file **exactly matches** \`${configuredProjectId}\`.`;
     } else if (error.message && error.message.includes("NEXT_PUBLIC_FIREBASE_API_KEY")) {
-        profileErrorMessage = `Firebase Initialization Failed: ${error.message}. Please ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set in your .env.local file and you've restarted your development server.`;
+        specificGuidance = `Firebase Initialization Failed: ${error.message}. Please ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set in your .env.local file and you've restarted your development server. The configured project ID is \`${configuredProjectId}\`.`;
     }
-     else {
-      profileErrorMessage = `${baseErrorMessage}
 
-      Please double-check all Firebase project settings, API enablement, and database creation for project \`${configuredProjectId}\`. Ensure your \`.env.local\` file matches the intended project.`;
-    }
+    profileErrorMessage = `**Critical Error Connecting to Firebase/Firestore for Project ID: ${configuredProjectId}**
+    The error received is: **${error.message || 'Unknown error'}** (Code: ${error.code || 'N/A'})
+    This usually means there's a configuration problem with your Firebase project itself, or your application's environment variables.
+
+    ${specificGuidance || `Please double-check all Firebase project settings, API enablement, and database creation for project \`${configuredProjectId}\`. Ensure your \`.env.local\` file matches the intended project and all Firebase variables are present.`}`;
   }
 
   const headersList = await headers(); 
@@ -86,7 +83,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
     return (
       <div className="flex flex-col min-h-screen items-center justify-center bg-background p-6 text-center">
-        <div className="bg-card p-8 rounded-lg shadow-2xl max-w-3xl w-full"> {/* Increased max-w for more text */}
+        <div className="bg-card p-8 rounded-lg shadow-2xl max-w-3xl w-full">
           <Icons.warning className="h-20 w-20 text-destructive mx-auto mb-6" />
           <h1 className="text-2xl font-bold text-destructive mb-4">Application Initialization Error</h1>
           <div 
@@ -146,6 +143,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex flex-col flex-1">
             <AppHeader />
             <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+              {/* DIAGNOSTIC DIV START - Helps confirm AppLayout structure renders */}
+              <div style={{ border: '5px solid limegreen', padding: '10px', backgroundColor: '#f0f0f0', marginBlockEnd: '20px', color: 'black' }}>
+                <p style={{ fontWeight: 'bold', fontSize: '1.2em' }}>AppLayout Diagnostic Info:</p>
+                <p>Current Path: {currentPath || 'N/A'}</p>
+                <p>User Profile Fetched: {userProfile ? 'Yes' : 'No'}</p>
+                <p>User Name: {userProfile?.name || 'N/A (or not fetched)'}</p>
+                <p>User Role: {userProfile?.role || 'N/A (or not fetched)'}</p>
+                <p>User Email: {userProfile?.email || 'N/A (or not fetched)'}</p>
+                <p>Attempting to render page content (children) below...</p>
+              </div>
+              {/* DIAGNOSTIC DIV END */}
               {children}
             </div>
           </div>

@@ -1,4 +1,7 @@
 
+import { config } from 'dotenv';
+config(); // Load .env file at the very beginning
+
 /**
  * @fileOverview Service for managing user profiles in Firestore.
  *

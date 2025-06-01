@@ -1,48 +1,70 @@
 
+'use server';
+/**
+ * @fileOverview Service for managing user profiles in Firestore.
+ *
+ * - getProfile - Fetches a user profile.
+ * - setProfile - Creates or updates a user profile.
+ * - initializeRoleProfile - Initializes a basic profile structure based on role.
+ * - getProfilesByRole - Fetches all user profiles matching a specific role.
+ */
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
-// Removed: import { config as dotenvConfig } from 'dotenv';
-// Removed: import path from 'path';
 
-// Removed the explicit .env.local loading block that was here.
-// Next.js handles .env.local loading automatically.
-
-// Environment variables to check
-const envVarsToCheck: Record<string, string> = {
+// Environment variables that *must* be defined in your .env file at the project root.
+const requiredEnvVars: Record<string, string> = {
   NEXT_PUBLIC_FIREBASE_API_KEY: 'apiKey',
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'authDomain',
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'projectId',
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'storageBucket',
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 'messagingSenderId',
   NEXT_PUBLIC_FIREBASE_APP_ID: 'appId',
+  // NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID is often optional but good practice
 };
 
-for (const [envVar, configKey] of Object.entries(envVarsToCheck)) {
+let initError: string | null = null;
+const missingVars: string[] = [];
+
+for (const [envVar, configKey] of Object.entries(requiredEnvVars)) {
   if (!process.env[envVar]) {
-    const errorMessage = `Firebase config error: Missing environment variable ${envVar} (for Firebase config key "${configKey}"). ` +
-    `Please ensure it's correctly set in your .env.local file and you've restarted your development server. Current value: ${process.env[envVar]}`;
-    console.error(`[FirebaseSetup] ${errorMessage}`);
-    // Throw an error to make it very clear during development
-    throw new Error(`[FirebaseSetup] Firebase Initialization Failed: ${errorMessage}. Check server logs and .env.local file.`);
+    missingVars.push(`${envVar} (for Firebase config key "${configKey}", current value: ${process.env[envVar]})`);
   }
 }
 
+if (missingVars.length > 0) {
+  const errorMessage = `Firebase config error: The following environment variable(s) are MISSING or UNDEFINED: \n- ${missingVars.join('\n- ')}\n` +
+  `Please ensure they are correctly set in your .env (or .env.local) file at the ROOT of your project. After adding/editing, you MUST restart your Next.js development server.`;
+  console.error(`[FirebaseSetup] CRITICAL_ERROR: ${errorMessage}`);
+  initError = `[FirebaseSetup] Firebase Initialization Failed: ${errorMessage}. Check server logs and your .env (or .env.local) file.`;
+}
+
+
+if (initError) {
+  throw new Error(initError);
+}
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Added measurementId just in case
+  apiKey:process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Measurement ID can be optional
 };
 
 // Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-  console.log('[FirebaseSetup] Firebase app initialized.');
+  try {
+    app = initializeApp(firebaseConfig);
+    console.log('[FirebaseSetup] Firebase app initialized successfully.');
+  } catch (e: any) {
+    console.error("[FirebaseSetup] CRITICAL_ERROR: Failed to initialize Firebase app with the provided config:", e.message);
+    console.error("[FirebaseSetup] Firebase Config Used:", firebaseConfig); // Log the actual config being used
+    throw new Error(`[FirebaseSetup] Failed to initialize Firebase app. Ensure config is correct and project is set up. Original error: ${e.message}`);
+  }
 } else {
   app = getApp();
   console.log('[FirebaseSetup] Existing Firebase app retrieved.');
@@ -52,3 +74,4 @@ const db: Firestore = getFirestore(app);
 const auth: Auth = getAuth(app);
 
 export { app, db, auth };
+

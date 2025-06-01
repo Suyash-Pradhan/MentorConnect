@@ -9,26 +9,26 @@ import { Button } from '@/components/ui/button';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
-import { SidebarInset } from '@/components/ui/sidebar'; 
+import { SidebarInset } from '@/components/ui/sidebar';
 import type { Profile } from '@/types';
 import { getProfile } from '@/services/profileService';
 
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+const MOCK_CURRENT_USER_ID = "user123_dev";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   let userProfile: Profile | null = null;
   let profileError: Error | null = null;
-  const currentPath = ''; 
+  const currentPath = ''; // This would ideally be obtained dynamically if needed for server-side redirects
 
   try {
     userProfile = await getProfile(MOCK_CURRENT_USER_ID);
   } catch (error: any) {
     console.error("[AppLayout] Error fetching profile:", error);
-    profileError = error; 
+    profileError = error;
   }
 
   if (profileError) {
-    const firebaseError = profileError as any; 
+    const firebaseError = profileError as any;
     let errorTitle = "Application Error";
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
     let troubleshootingSteps: React.ReactNode[] = [];
@@ -85,20 +85,23 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  if (userProfile && !userProfile.role && currentPath !== '/role-selection') {
-    // redirect('/role-selection'); // Server-side redirect, might need client-side for some cases
-  }
+  // TODO: Implement proper currentPath detection if server-side redirects are needed for role selection.
+  // For now, client-side navigation handles this.
+  // if (userProfile && !userProfile.role && currentPath !== '/role-selection') {
+  //   redirect('/role-selection');
+  // }
+  // if (!userProfile && currentPath !== '/role-selection' && currentPath !== '/login' && currentPath !== '/signup') {
+  //    Consider redirecting to login or role-selection if no profile and not on an auth page.
+  //    redirect('/login'); // Or '/role-selection' depending on flow
+  // }
 
-  if (!userProfile && currentPath !== '/role-selection') {
-    // redirect('/role-selection'); // Server-side redirect
-  }
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen flex-col w-full"> {/* Added w-full here */}
-        <AppHeader />
-        <div className="flex flex-1 w-full"> 
-          <AppSidebar />
+      <div className="flex min-h-screen flex-col w-full">
+        <AppHeader userProfile={userProfile} />
+        <div className="flex flex-1 w-full">
+          <AppSidebar userProfile={userProfile} />
           <SidebarInset className="p-4 md:p-6 lg:p-8">
             {children}
           </SidebarInset>

@@ -17,30 +17,19 @@ import {
 import { Icons } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle"; // Import ThemeToggle
+import { ThemeToggle } from "@/components/theme-toggle";
+import type { Profile } from "@/types"; // Import Profile type
 
-// Mock user data - replace with actual auth context
-const mockUser = {
-  name: "User Name",
-  email: "user@example.com",
-  avatarUrl: "https://placehold.co/100x100.png",
-  role: "student" as "student" | "alumni" | null, // Example role
-};
-
-
-export function UserNav() {
+export function UserNav({ userProfile: user }: { userProfile: Profile | null }) {
   const router = useRouter();
   const { toast } = useToast();
-  // In a real app, you'd get user from an auth context
-  const user = mockUser;
 
   const handleLogout = async () => {
-    // Simulate logout
     await new Promise(resolve => setTimeout(resolve, 500));
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
     router.push("/");
   };
-  
+
   if (!user) {
     return (
       <div className="flex items-center gap-2">
@@ -59,7 +48,7 @@ export function UserNav() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-9 w-9 rounded-full">
             <Avatar className="h-9 w-9">
-              <AvatarImage src={user.avatarUrl} alt={user.name ?? ""} data-ai-hint="profile person" />
+              <AvatarImage src={user.avatarUrl || `https://placehold.co/40x40.png`} alt={user.name ?? ""} data-ai-hint="profile person" />
               <AvatarFallback>{user.name ? user.name.charAt(0).toUpperCase() : "U"}</AvatarFallback>
             </Avatar>
           </Button>
@@ -67,7 +56,7 @@ export function UserNav() {
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{user.name}</p>
+              <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
               <p className="text-xs leading-none text-muted-foreground">
                 {user.email}
               </p>
@@ -89,10 +78,9 @@ export function UserNav() {
               </DropdownMenuItem>
             </Link>
             <Link href="/settings" passHref legacyBehavior>
-              <DropdownMenuItem disabled> {/* Disabled as settings page not implemented */}
+              <DropdownMenuItem disabled>
                 <Icons.settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
-                {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
               </DropdownMenuItem>
             </Link>
           </DropdownMenuGroup>
@@ -100,12 +88,9 @@ export function UserNav() {
           <DropdownMenuItem onClick={handleLogout}>
             <Icons.logout className="mr-2 h-4 w-4" />
             <span>Log out</span>
-            {/* <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut> */}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
 }
-
-    

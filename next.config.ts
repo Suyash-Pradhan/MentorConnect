@@ -38,7 +38,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.fs = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
-      config.resolve.fallback.http2 = false; // Added http2 fallback
+      config.resolve.fallback.http2 = false;
+      config.resolve.fallback.dns = false; // Added dns fallback
     }
     // Important: return the modified config
     return config;

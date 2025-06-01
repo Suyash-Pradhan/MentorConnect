@@ -119,10 +119,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <AppHeader />
         <div className="flex flex-1">
           <AppSidebar />
-          <SidebarInset> {/* Use SidebarInset to wrap the main content area */}
-            <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
-              {children}
-            </main>
+          <SidebarInset className="p-4 md:p-6 lg:p-8"> {/* Apply padding directly to SidebarInset */}
+            {children}
           </SidebarInset>
         </div>
       </div>

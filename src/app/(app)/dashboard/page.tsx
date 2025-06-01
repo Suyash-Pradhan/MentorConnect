@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Briefcase, MessageSquareHeart, UserPlus, Users, BookOpenText } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import type { Profile, Post } from "@/types"; // Import Post type
+import type { Profile, Post, MentorshipRequest } from "@/types"; // Import Post and MentorshipRequest type
 import { getProfile } from "@/services/profileService";
 import { getAllPosts, getPostsByAuthor } from "@/services/postService"; // Import post services
+import { getMentorshipRequestsForUser } from "@/services/mentorshipService"; // Import mentorship service
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // Can be "student123" or "alumni456" etc.
-                                          // For testing, use "alumni456" to see alumni dashboard parts
+const MOCK_CURRENT_USER_ID = "user123_dev";
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -23,22 +23,22 @@ export default function DashboardPage() {
   const [isLoadingProfile, setIsLoadingProfile] = React.useState(true);
   
   // Student specific data
-  const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); // Placeholder for now
+  const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
   const [recentPosts, setRecentPosts] = React.useState<Post[]>([]);
   const [isLoadingRecentPosts, setIsLoadingRecentPosts] = React.useState(false);
 
   // Alumni specific data
   const [myRecentPosts, setMyRecentPosts] = React.useState<Post[]>([]);
   const [isLoadingMyPosts, setIsLoadingMyPosts] = React.useState(false);
+  const [newMentorshipRequestsCount, setNewMentorshipRequestsCount] = React.useState(0);
+  const [activeMenteesCount, setActiveMenteesCount] = React.useState(0);
+  const [isLoadingMentorshipStats, setIsLoadingMentorshipStats] = React.useState(false);
 
-  // Mock data for parts not yet connected to DB
+
+  // Mock data for parts not yet connected to DB for student
   const studentDashboardStats = {
-    pendingRequests: 2, // Mock
-    upcomingMeetings: 1, // Mock
-  };
-  const alumniDashboardStats = {
-    newMentorshipRequests: 3, // Mock
-    activeMentees: 5, // Mock
+    pendingRequests: 2, 
+    upcomingMeetings: 1, 
   };
 
 
@@ -63,7 +63,7 @@ export default function DashboardPage() {
       const fetchRecentPosts = async () => {
         setIsLoadingRecentPosts(true);
         try {
-          const posts = await getAllPosts({ limit: 3 }); // Fetch latest 3 posts
+          const posts = await getAllPosts({ limit: 3 }); 
           setRecentPosts(posts);
         } catch (error) {
           console.error("Failed to fetch recent posts:", error);
@@ -73,18 +73,14 @@ export default function DashboardPage() {
         }
       };
       fetchRecentPosts();
-      // TODO: Fetch recommendedAlumni logic
-      // For now, setting some placeholder alumni if needed for UI structure
-      setRecommendedAlumni([
-        // { id: "1", name: "Dr. Alok Sharma", field: "AI Research", avatar: "https://placehold.co/100x100.png?text=AS" },
-        // { id: "2", name: "Priya Singh", field: "Software Engineering", avatar: "https://placehold.co/100x100.png?text=PS" },
-      ]);
+      setRecommendedAlumni([]); // Placeholder for actual recommendations
     } else if (currentUser?.role === 'alumni') {
       const fetchMyPosts = async () => {
         setIsLoadingMyPosts(true);
         try {
-          const posts = await getPostsByAuthor(MOCK_CURRENT_USER_ID);
-          setMyRecentPosts(posts.slice(0, 3)); // Show latest 3 of my posts
+          // For alumni, MOCK_CURRENT_USER_ID is used, in real app use currentUser.id
+          const posts = await getPostsByAuthor(MOCK_CURRENT_USER_ID); 
+          setMyRecentPosts(posts.slice(0, 3)); 
         } catch (error) {
           console.error("Failed to fetch my posts:", error);
           toast({ variant: "destructive", title: "Error", description: "Could not load your posts." });
@@ -92,7 +88,26 @@ export default function DashboardPage() {
           setIsLoadingMyPosts(false);
         }
       };
+
+      const fetchAlumniMentorshipStats = async () => {
+        setIsLoadingMentorshipStats(true);
+        try {
+          // For alumni, MOCK_CURRENT_USER_ID is used, in real app use currentUser.id
+          const requests = await getMentorshipRequestsForUser(MOCK_CURRENT_USER_ID, 'alumni');
+          const pendingCount = requests.filter(req => req.status === 'pending').length;
+          const acceptedCount = requests.filter(req => req.status === 'accepted').length;
+          setNewMentorshipRequestsCount(pendingCount);
+          setActiveMenteesCount(acceptedCount);
+        } catch (error) {
+          console.error("Failed to fetch mentorship stats:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not load mentorship statistics." });
+        } finally {
+          setIsLoadingMentorshipStats(false);
+        }
+      };
+
       fetchMyPosts();
+      fetchAlumniMentorshipStats();
     }
   }, [currentUser, toast]);
 
@@ -112,7 +127,7 @@ export default function DashboardPage() {
   const userRole = currentUser.role;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       <Card className="shadow-md">
         <CardHeader>
           <CardTitle className="text-3xl">Welcome back, {userName}!</CardTitle>
@@ -165,7 +180,6 @@ export default function DashboardPage() {
             
             <div>
               <h3 className="text-lg font-semibold mb-2">Recommended Alumni</h3>
-              {/* Recommended Alumni logic needs to be implemented */}
               {recommendedAlumni.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {recommendedAlumni.map(alumni => (
@@ -208,7 +222,13 @@ export default function DashboardPage() {
         <Card className="shadow-md">
           <CardHeader><CardTitle className="text-2xl">Alumni Dashboard</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-             <p className="text-muted-foreground">You have <span className="font-semibold text-primary">{alumniDashboardStats.newMentorshipRequests} new mentorship requests</span> and are actively mentoring <span className="font-semibold text-primary">{alumniDashboardStats.activeMentees} students</span>.</p>
+            {isLoadingMentorshipStats ? (
+              <Skeleton className="h-5 w-3/4" />
+            ) : (
+              <p className="text-muted-foreground">
+                You have <span className="font-semibold text-primary">{newMentorshipRequestsCount} new mentorship requests</span> and are actively mentoring <span className="font-semibold text-primary">{activeMenteesCount} students</span>.
+              </p>
+            )}
             <div>
               <h3 className="text-lg font-semibold mb-2">Your Recent Posts</h3>
                {isLoadingMyPosts ? <PostListSkeleton /> : myRecentPosts.length > 0 ? (
@@ -216,7 +236,6 @@ export default function DashboardPage() {
                   {myRecentPosts.map(post => (
                     <li key={post.id} className="p-3 bg-secondary rounded-md shadow-sm">
                       <Link href={`/posts/${post.id}`} className="font-medium text-primary hover:underline">{post.title}</Link>
-                      {/* Add view count if available from DB */}
                     </li>
                   ))}
                 </ul>
@@ -235,14 +254,26 @@ export default function DashboardPage() {
 }
 
 const DashboardSkeleton = () => (
-  <div className="space-y-6">
+  <div className="space-y-6 w-full">
     <Card><CardHeader><Skeleton className="h-8 w-3/5" /><Skeleton className="h-4 w-4/5 mt-2" /></CardHeader></Card>
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {Array.from({length:3}).map((_,i) => (
         <Card key={i}><CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent><Skeleton className="h-4 w-3/4 mb-4" /><Skeleton className="h-10 w-2/3" /></CardContent></Card>
       ))}
     </div>
-    <Card><CardHeader><Skeleton className="h-7 w-1/3" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-5 w-full" /><div><Skeleton className="h-5 w-1/4 mb-2" /><div className="space-y-2">{Array.from({length:2}).map((_,j)=><Skeleton key={j} className="h-10 w-full"/>)}</div></div></CardContent></Card>
+    <Card>
+        <CardHeader><Skeleton className="h-7 w-1/3" /></CardHeader>
+        <CardContent className="space-y-4">
+            <Skeleton className="h-5 w-full" /> 
+            <div>
+                <Skeleton className="h-5 w-1/4 mb-2" />
+                <div className="space-y-2">
+                    {Array.from({length:2}).map((_,j)=><Skeleton key={j} className="h-10 w-full"/>)}
+                </div>
+            </div>
+             <Skeleton className="h-10 w-40 mt-2" />
+        </CardContent>
+    </Card>
   </div>
 );
 
@@ -256,3 +287,6 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
+
+
+      

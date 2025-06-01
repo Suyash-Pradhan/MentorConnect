@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
       // Initialize fallback if it doesn't exist, then add specific fallbacks
       config.resolve.fallback = config.resolve.fallback || {};
       config.resolve.fallback.async_hooks = false;
-      config.resolve.fallback['node:async_hooks'] = false; // Added for node: prefix
+      config.resolve.fallback['node:async_hooks'] = false; // Handles "node:async_hooks"
       config.resolve.fallback.fs = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.dns = false;
       config.resolve.fallback.child_process = false;
       config.resolve.fallback.perf_hooks = false;
-      config.resolve.fallback['node:perf_hooks'] = false; // Added for node: prefix
+      config.resolve.fallback['node:perf_hooks'] = false; // Handles "node:perf_hooks"
     }
     // Important: return the modified config
     return config;

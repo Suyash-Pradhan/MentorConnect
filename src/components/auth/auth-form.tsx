@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Changed from "next/navigation"
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,15 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase"; // Import Firebase auth instance
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence 
+} from "firebase/auth";
+import { getProfile, setProfile } from "@/services/profileService";
+import type { Profile } from "@/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -47,38 +57,98 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
   const onSubmit = async (data: UserFormValue) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    try {
+      // Set auth persistence to local, so user stays signed in.
+      await setPersistence(auth, browserLocalPersistence);
 
-    // This is where you would integrate with your actual authentication service (e.g., Firebase)
-    if (isSignUp) {
-      // Handle sign up
-      console.log("Sign up data:", data);
-      toast({
-        title: "Account Created!",
-        description: "You have successfully signed up. Redirecting to role selection...",
-      });
-      // On actual successful signup & login, redirect to role selection if new user, or dashboard
-      router.push("/role-selection"); // Simulate new user flow
-    } else {
-      // Handle login
-      console.log("Login data:", data);
-      // Simulate a login scenario where role is already selected
-      const userHasSelectedRole = Math.random() > 0.5; // Simulate if role is selected
-      if (userHasSelectedRole) {
-         toast({
-          title: "Login Successful!",
-          description: "Welcome back to MentorConnect.",
-        });
-        router.push("/dashboard");
-      } else {
+      if (isSignUp) {
+        const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        const firebaseUser = userCredential.user;
+
+        // Create a profile in Firestore for the new user
+        const newProfile: Profile = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || data.email, // Use email from auth if available
+          role: null, // Role will be set on the role-selection page
+          name: "", // Name can be set later in profile edit
+          avatarUrl: firebaseUser.photoURL || "",
+          createdAt: new Date(), // profileService handles serverTimestamp for new docs
+        };
+        await setProfile(firebaseUser.uid, newProfile);
+
         toast({
-          title: "Login Successful!",
-          description: "Please select your role to continue.",
+          title: "Account Created!",
+          description: "You have successfully signed up. Please select your role.",
         });
         router.push("/role-selection");
+      } else { // Login
+        const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+        const firebaseUser = userCredential.user;
+
+        // Fetch profile to check if role is selected
+        const userProfile = await getProfile(firebaseUser.uid);
+
+        if (userProfile && userProfile.role) {
+          toast({
+            title: "Login Successful!",
+            description: "Welcome back to MentorConnect.",
+          });
+          router.push("/dashboard");
+        } else {
+          // If profile doesn't exist or role is not set, go to role selection
+          toast({
+            title: "Login Successful!",
+            description: "Please select your role to continue.",
+          });
+           // Ensure profile exists even if role is null (e.g. if signup failed to create one somehow)
+           if (!userProfile) {
+             const profileToEnsure: Profile = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || data.email,
+                role: null,
+                createdAt: new Date(),
+             };
+             await setProfile(firebaseUser.uid, profileToEnsure);
+           }
+          router.push("/role-selection");
+        }
       }
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code) {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            errorMessage = "This email address is already in use.";
+            break;
+          case "auth/invalid-email":
+            errorMessage = "The email address is not valid.";
+            break;
+          case "auth/operation-not-allowed":
+            errorMessage = "Email/password accounts are not enabled.";
+            break;
+          case "auth/weak-password":
+            errorMessage = "The password is too weak.";
+            break;
+          case "auth/user-disabled":
+            errorMessage = "This user account has been disabled.";
+            break;
+          case "auth/user-not-found":
+          case "auth/wrong-password":
+          case "auth/invalid-credential":
+            errorMessage = "Invalid email or password.";
+            break;
+          default:
+            errorMessage = error.message || errorMessage;
+        }
+      }
+      toast({
+        variant: "destructive",
+        title: isSignUp ? "Sign Up Failed" : "Login Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 

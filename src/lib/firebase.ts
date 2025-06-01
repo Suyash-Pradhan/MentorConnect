@@ -1,5 +1,4 @@
 
-'use server';
 /**
  * @fileOverview Service for managing user profiles in Firestore.
  *
@@ -23,7 +22,6 @@ const requiredEnvVars: Record<string, string> = {
   // NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID is often optional but good practice
 };
 
-let initError: string | null = null;
 const missingVars: string[] = [];
 
 for (const [envVar, configKey] of Object.entries(requiredEnvVars)) {
@@ -36,13 +34,10 @@ if (missingVars.length > 0) {
   const errorMessage = `Firebase config error: The following environment variable(s) are MISSING or UNDEFINED: \n- ${missingVars.join('\n- ')}\n` +
   `Please ensure they are correctly set in your .env (or .env.local) file at the ROOT of your project. After adding/editing, you MUST restart your Next.js development server.`;
   console.error(`[FirebaseSetup] CRITICAL_ERROR: ${errorMessage}`);
-  initError = `[FirebaseSetup] Firebase Initialization Failed: ${errorMessage}. Check server logs and your .env (or .env.local) file.`;
+  // Throw an error to make it very clear during development, especially if it's a critical config like API key
+  throw new Error(`[FirebaseSetup] Firebase Initialization Failed due to missing environment variables: ${missingVars.join(', ')}. Check server logs and your .env (or .env.local) file.`);
 }
 
-
-if (initError) {
-  throw new Error(initError);
-}
 
 const firebaseConfig = {
   apiKey:process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -74,4 +69,3 @@ const db: Firestore = getFirestore(app);
 const auth: Auth = getAuth(app);
 
 export { app, db, auth };
-

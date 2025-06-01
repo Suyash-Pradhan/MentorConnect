@@ -33,10 +33,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   } catch (error: any) {
     console.error("AppLayout: Failed to fetch user profile:", error); // This log helps identify Firebase issues
     profileError = true;
-    if (error.code && error.code.includes("unavailable")) { // Firebase unavailable error
-        profileErrorMessage = "Could not connect to the database (client is offline or service unavailable). Please ensure your internet connection is stable, the Cloud Firestore API is enabled for your project, and a Firestore database instance has been created and is fully propagated in the Firebase console. It may take a few minutes (5-15+) for these services to become active after enabling them.";
+    if (error.code && (error.code.includes("unavailable") || error.code.includes("offline"))) {
+        profileErrorMessage = "**Connection to Database Failed (Client Offline)**. This often occurs if the Firestore API was recently enabled or the database was just created. Please:\n1. **Wait 10-15 minutes** for Google's services to fully update.\n2. **Restart your application server** (using the controls in your development environment).\n3. Ensure your internet connection is stable.\nIf the problem continues, verify in the Firebase/Google Cloud Console that the 'Cloud Firestore API' is enabled and a Firestore database instance exists for your project.";
     } else if (error.message && error.message.includes("PERMISSION_DENIED")) {
-      profileErrorMessage = "Permission denied when trying to access the database. Please check your Firestore security rules and ensure the Cloud Firestore API is enabled for your project in the Google Cloud Console and has had time to propagate (5-15+ min).";
+      profileErrorMessage = "Permission denied when trying to access the database. Please ensure the Cloud Firestore API is enabled for your project in the Google Cloud Console (it may take 5-15+ min to propagate) and check your Firestore security rules.";
     } else if (error.message && error.message.includes("NEXT_PUBLIC_FIREBASE_API_KEY")) {
         profileErrorMessage = `Firebase Initialization Failed: ${error.message}. Please ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set in your .env.local file and you've restarted your development server.`;
     }
@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     }
   }
 
-  const headersList = await headers(); // Changed: await headers()
+  const headersList = await headers();
   const currentPath = headersList.get('next-url'); // Gets the current internal URL, e.g., /dashboard
 
   // If profile fetch failed or user exists but has no role, redirect to role selection,
@@ -59,16 +59,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center bg-background p-4 text-center">
         <Icons.warning className="h-16 w-16 text-destructive mb-4" />
-        <h1 className="text-2xl font-semibold text-destructive">Error Loading Profile</h1>
-        <p className="text-muted-foreground max-w-md">
+        <h1 className="text-2xl font-semibold text-destructive">Error Loading User Data</h1>
+        <p className="text-muted-foreground max-w-lg whitespace-pre-line">
           {profileErrorMessage}
         </p>
         <div className="mt-6 space-x-2">
-           <Button asChild>
-            <Link href="/login">Try Logging In Again</Link>
+           <Button asChild variant="outline">
+            <Link href="/">Go to Homepage</Link>
           </Button>
         </div>
-         <p className="text-sm text-muted-foreground mt-4">If this issue persists, please review your Firebase project setup and ensure all services are active and have propagated. A server restart might also be necessary.</p>
+         <p className="text-sm text-muted-foreground mt-4">If this issue persists after following the steps above, please double-check your Firebase project setup in the Google Cloud & Firebase consoles. A server restart is often necessary after configuration changes.</p>
       </div>
     );
   }

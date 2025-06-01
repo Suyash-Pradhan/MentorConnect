@@ -1,27 +1,22 @@
 
 /**
- * @fileOverview Service for managing user profiles in Firestore.
- *
- * - getProfile - Fetches a user profile.
- * - setProfile - Creates or updates a user profile.
- * - initializeRoleProfile - Initializes a basic profile structure based on role.
- * - getProfilesByRole - Fetches all user profiles matching a specific role.
+ * @fileOverview Firebase setup and initialization.
  */
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 
 // Debug log for environment variables
-console.log("[FirebaseSetup] Attempting to read Firebase env values:", {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+console.log("[FirebaseSetup] Attempting to read Firebase env values from process.env:", {
+  NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  GOOGLE_API_KEY: process.env.GOOGLE_API_KEY, // Also log this for Genkit if needed
 });
-console.log("[FirebaseSetup] GOOGLE_API_KEY:", process.env.GOOGLE_API_KEY);
 
 
 // Environment variables that *must* be defined in your .env file at the project root.
@@ -32,7 +27,6 @@ const requiredEnvVars: Record<string, string> = {
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'storageBucket',
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 'messagingSenderId',
   NEXT_PUBLIC_FIREBASE_APP_ID: 'appId',
-  // NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID is often optional but good practice
 };
 
 const missingVars: string[] = [];
@@ -59,10 +53,9 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Measurement ID can be optional
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
   try {
@@ -70,7 +63,7 @@ if (!getApps().length) {
     console.log('[FirebaseSetup] Firebase app initialized successfully.');
   } catch (e: any) {
     console.error("[FirebaseSetup] CRITICAL_ERROR: Failed to initialize Firebase app with the provided config:", e.message);
-    console.error("[FirebaseSetup] Firebase Config Used:", firebaseConfig); // Log the actual config being used
+    console.error("[FirebaseSetup] Firebase Config Used:", firebaseConfig);
     throw new Error(`[FirebaseSetup] Failed to initialize Firebase app. Ensure config is correct and project is set up. Original error: ${e.message}`);
   }
 } else {

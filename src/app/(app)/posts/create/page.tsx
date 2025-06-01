@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Icons } from "@/components/icons";
@@ -19,7 +19,7 @@ import { getProfile } from "@/services/profileService"; // To get current user f
 import { Skeleton } from "@/components/ui/skeleton";
 
 // MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // Changed from "alumni456" to align with global mock
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 const postFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100),

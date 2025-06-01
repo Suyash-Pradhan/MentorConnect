@@ -2,17 +2,16 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { AppHeader } from '@/components/layout/app-header';
-import { AppSidebar } from '@/components/layout/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+// import { AppHeader } from '@/components/layout/app-header'; // Temporarily removed
+// import { AppSidebar } from '@/components/layout/app-sidebar'; // Temporarily removed
+// import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'; // Temporarily removed
 import { getProfile } from '@/services/profileService';
-import { Icons } from '@/components/icons';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-
+// import { Icons } from '@/components/icons'; // Temporarily removed
+// import { Button } from '@/components/ui/button'; // Temporarily removed
+// import Link from 'next/link'; // Temporarily removed
 
 // MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // Replace with actual dynamic user ID
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   let userProfile;
@@ -20,9 +19,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   let profileErrorMessage = "Could not load essential user data. This might be due to a temporary network issue or if the backend services are still initializing. Please check your internet connection.";
   const configuredProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "PROJECT_ID_NOT_CONFIGURED_IN_ENV";
 
-
-  // This is a conceptual check. In a real app, this would involve server-side checks or middleware.
-  // For now, we assume if the user reaches this layout, they are "authenticated" in a mock sense.
   const userIsAuthenticated = MOCK_CURRENT_USER_ID ? true : false;
 
   if (!userIsAuthenticated) {
@@ -37,128 +33,98 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     
     let specificGuidance = "";
     if (error.code && (error.code.includes("permission-denied") || error.code === 'PERMISSION_DENIED' || (error.message && error.message.toLowerCase().includes("firestore api has not been used")))) {
-      specificGuidance = `
-      This **"PERMISSION_DENIED"** error means the Cloud Firestore API is not enabled for your Firebase project **${configuredProjectId}**, or there's a mismatch with the project you're configuring.
-
-      **Action Required (Ensure you are logged into the CORRECT Google Account for project ${configuredProjectId}):**
-      1.  **VERIFY GOOGLE ACCOUNT**: Double-check you are logged into Google Cloud & Firebase consoles with the account that OWNS or has EDITOR permissions on project \`${configuredProjectId}\`.
-      2.  **ENABLE API**: Go to: [https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId}](https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId})
-          *   If it shows an "Enable" button, **CLICK IT**.
-      3.  **CREATE DATABASE**: In the Firebase Console for project \`${configuredProjectId}\` ([https://console.firebase.google.com/project/${configuredProjectId}/firestore](https://console.firebase.google.com/project/${configuredProjectId}/firestore)), ensure a Firestore database instance has been **CREATED**. If you see "Create database", click it and follow the prompts (select region, start in "test mode").
-      4.  **WAIT**: After enabling/creating, **WAIT 10-20 minutes** for changes to propagate.
-      5.  **RESTART SERVER**: Stop and restart your Next.js development server.
-      6.  **PROJECT ID CHECK**: Ensure \`NEXT_PUBLIC_FIREBASE_PROJECT_ID\` in your \`.env.local\` file **exactly matches** \`${configuredProjectId}\`. If it says "PROJECT_ID_NOT_CONFIGURED_IN_ENV" above, your .env.local file is not being read correctly or the variable is missing.`;
+      specificGuidance = `This **"PERMISSION_DENIED"** error means the Cloud Firestore API is not enabled for project **${configuredProjectId}**, or there's a mismatch. 
+      **Action Required (Ensure you are logged into the CORRECT Google Account for project ${configuredProjectId}):** 
+      1. **VERIFY GOOGLE ACCOUNT**. 
+      2. **ENABLE API**: Go to: [https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId}](https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${configuredProjectId}). Click "Enable" if present. 
+      3. **CREATE DATABASE**: In Firebase Console for project \`${configuredProjectId}\`, ensure a Firestore database instance has been **CREATED**. 
+      4. **WAIT 10-20 minutes** & **RESTART SERVER**.
+      5. **PROJECT ID CHECK**: Ensure \`NEXT_PUBLIC_FIREBASE_PROJECT_ID\` in \`.env.local\` **exactly matches** \`${configuredProjectId}\`. The project ID Firestore console shows you're in MUST match this.`;
     } else if (error.code && (error.code.includes("unavailable") || error.code === 'UNAVAILABLE' || (error.message && error.message.toLowerCase().includes("offline")))) {
-        specificGuidance = `
-        This **"offline" or "unavailable"** error suggests the Firestore service was recently enabled/created and needs more time, or there's a network issue.
-
-        **Action Required:**
-        1.  If you recently enabled the Firestore API or created the database for project \`${configuredProjectId}\`, please **WAIT 15-30 minutes** for Google's systems to fully update.
-        2.  Ensure your Next.js server environment has stable internet connectivity.
-        3.  Verify the Firestore database instance for project \`${configuredProjectId}\` was fully created/initialized in the Firebase Console.
-        4.  **After waiting/verifying, RESTART your Next.js development server.**
-        5.  **PROJECT ID CHECK**: Ensure \`NEXT_PUBLIC_FIREBASE_PROJECT_ID\` in your \`.env.local\` file **exactly matches** \`${configuredProjectId}\`.`;
+        specificGuidance = `This **"offline" or "unavailable"** error suggests a recent Firestore enablement/creation needing more time, or a network issue. 
+        **Action Required:** 
+        1. If you recently enabled/created Firestore for project \`${configuredProjectId}\`, **WAIT 15-30 minutes**. 
+        2. Check server internet connectivity. 
+        3. **After waiting, RESTART your Next.js server.**`;
     } else if (error.message && error.message.includes("NEXT_PUBLIC_FIREBASE_API_KEY")) {
-        specificGuidance = `Firebase Initialization Failed: ${error.message}. Please ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set in your .env.local file and you've restarted your development server. The configured project ID is \`${configuredProjectId}\`.`;
+        specificGuidance = `Firebase Initialization Failed: ${error.message}. Check .env.local for Firebase variables and restart server. Configured project ID: \`${configuredProjectId}\`.`;
     }
 
-    profileErrorMessage = `**Critical Error Connecting to Firebase/Firestore for Project ID: ${configuredProjectId}**
+    profileErrorMessage = `**AppLayout: Critical Error Connecting to Firebase/Firestore for Project ID: ${configuredProjectId}**
     The error received is: **${error.message || 'Unknown error'}** (Code: ${error.code || 'N/A'})
-    This usually means there's a configuration problem with your Firebase project itself, or your application's environment variables.
+    This usually means a Firebase project configuration problem or incorrect .env.local variables.
 
-    ${specificGuidance || `Please double-check all Firebase project settings, API enablement, and database creation for project \`${configuredProjectId}\`. Ensure your \`.env.local\` file matches the intended project and all Firebase variables are present.`}`;
+    ${specificGuidance || `Please double-check all Firebase project settings, API enablement, and database creation for project \`${configuredProjectId}\`. Ensure your \`.env.local\` file matches the intended project.`}`;
   }
 
   const headersList = await headers(); 
   const currentPath = headersList.get('next-url');
-
-  if (currentPath !== '/role-selection' && userIsAuthenticated && !profileError && (!userProfile || !userProfile.role)) {
-    redirect('/role-selection');
-  }
-
 
   if (profileError) {
     const firestoreApiLink = `https://console.cloud.google.com/apis/library/firestore.googleapis.com?project=${configuredProjectId === "PROJECT_ID_NOT_CONFIGURED_IN_ENV" ? "" : configuredProjectId}`;
     const firebaseConsoleLink = `https://console.firebase.google.com/project/${configuredProjectId === "PROJECT_ID_NOT_CONFIGURED_IN_ENV" ? "" : configuredProjectId}/firestore`;
 
     return (
-      <div className="flex flex-col min-h-screen items-center justify-center bg-background p-6 text-center">
-        <div className="bg-card p-8 rounded-lg shadow-2xl max-w-3xl w-full">
-          <Icons.warning className="h-20 w-20 text-destructive mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-destructive mb-4">Application Initialization Error</h1>
-          <div 
-            className="text-muted-foreground whitespace-pre-line text-left leading-relaxed text-sm" 
-            dangerouslySetInnerHTML={{ __html: profileErrorMessage.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} 
-          />
-          
-          <div className="mt-6 space-y-3 bg-secondary/30 p-4 rounded-md border border-destructive/20">
-              <h2 className="text-lg font-semibold text-foreground">Key Troubleshooting Links:</h2>
-              <p className="text-xs text-muted-foreground text-left">
-                  Ensure you are logged in with the correct Google account before opening. App configured for Project ID: <strong className="text-primary">{configuredProjectId}</strong>.
-              </p>
-              <ul className="list-disc list-inside text-xs text-muted-foreground text-left space-y-1 mt-2">
-                  <li>
-                      <a href={firestoreApiLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Enable Cloud Firestore API in Google Cloud Console</a>
-                  </li>
-                  <li>
-                      <a href={firebaseConsoleLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Create/Check Firestore Database in Firebase Console</a>
-                  </li>
-                  <li>
-                      If \`PROJECT_ID_NOT_CONFIGURED_IN_ENV\` is shown, or if it doesn't match the project you are configuring in the Firebase/Cloud console, check your <code>.env.local</code> file for <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code> and all other Firebase config values. Restart the server after changes.
-                  </li>
-              </ul>
-          </div>
-          <Button asChild variant="outline" className="mt-6">
-              <Link href="/">Return to Public Homepage</Link>
-          </Button>
-          <p className="text-xs text-muted-foreground mt-4">This application cannot function without a successful database connection and correct API enablement for the configured Firebase Project.</p>
+      <div style={{minHeight: '100vh', border: '10px solid red', backgroundColor: 'lightpink', padding: '20px', color: 'black', fontFamily: 'monospace'}}>
+        <h1 style={{fontSize: '24px', fontWeight: 'bold', color: 'darkred'}}>AppLayout: Profile Fetch Error Occurred</h1>
+        <p>Current Path: {currentPath || 'N/A (Could not get path)'}</p>
+        <p>Configured Project ID in .env.local: <strong>{configuredProjectId}</strong></p>
+        <hr style={{margin: '10px 0', borderColor: 'darkred'}} />
+        <div 
+          style={{whiteSpace: 'pre-wrap', lineHeight: '1.6'}}
+          dangerouslySetInnerHTML={{ __html: profileErrorMessage.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} 
+        />
+        <div style={{marginTop: '20px', padding: '10px', backgroundColor: 'rgba(0,0,0,0.05)'}}>
+            <h2 style={{fontWeight: 'bold'}}>Key Troubleshooting Links (ensure logged in with correct Google Account):</h2>
+            <ul style={{listStyle: 'disc', paddingLeft: '20px'}}>
+                <li><a href={firestoreApiLink} target="_blank" rel="noopener noreferrer" style={{color: 'blue'}}>Enable Cloud Firestore API</a> (for project: {configuredProjectId})</li>
+                <li><a href={firebaseConsoleLink} target="_blank" rel="noopener noreferrer" style={{color: 'blue'}}>Create/Check Firestore Database in Firebase Console</a> (for project: {configuredProjectId})</li>
+                <li>If \`PROJECT_ID_NOT_CONFIGURED_IN_ENV\` or mismatch: Check <code>.env.local</code> for <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code>. Restart server after changes.</li>
+            </ul>
         </div>
+        <p style={{marginTop: '10px', fontSize: '0.9em'}}>This application cannot function without successful database connection.</p>
       </div>
     );
+  }
+
+  if (currentPath !== '/role-selection' && userIsAuthenticated && !profileError && (!userProfile || !userProfile.role)) {
+    redirect('/role-selection');
   }
 
   if (currentPath === '/role-selection' && (!userProfile || !userProfile.role)) {
-     // Allow rendering role-selection page
+     // Allow role-selection page to render; it's handled by children.
+     // This is a valid state.
   } else if (!userProfile || !userProfile.role) {
-     return (
-      <div className="flex flex-col min-h-screen items-center justify-center bg-background p-4 text-center">
-        <Icons.userCircle className="h-16 w-16 text-primary mb-4" />
-        <h1 className="text-2xl font-semibold text-foreground">Role Selection Needed</h1>
-        <p className="text-muted-foreground max-w-md">
-          Please complete your role selection to continue. Your profile data might be missing or incomplete.
-        </p>
-        <Button asChild className="mt-4">
-          <Link href="/role-selection">Go to Role Selection</Link>
-        </Button>
+     // This state implies we are NOT on /role-selection but profile/role is missing.
+     // The redirect above should have caught this. If we reach here, it's an unexpected state.
+     // Render a message and a link to role selection.
+    return (
+      <div style={{minHeight: '100vh', border: '10px solid orange', backgroundColor: 'lightyellow', padding: '20px', color: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace' }}>
+        <h1 style={{fontSize: '24px', fontWeight: 'bold', color: 'darkorange'}}>AppLayout: Role Selection Required or Profile Incomplete</h1>
+        <p>Current Path: {currentPath || 'N/A'}</p>
+        <p>User Profile Exists: {userProfile ? 'Yes' : 'No'}</p>
+        <p>User Role Set: {userProfile?.role || 'No'}</p>
+        <p>This page requires a complete profile with a role. You might have been redirected here if your profile is incomplete.</p>
+        <p>If you are seeing this on a page other than /role-selection, something is unexpected.</p>
+        <a href="/role-selection" style={{marginTop: '20px', padding: '10px 20px', backgroundColor: 'blue', color: 'white', textDecoration: 'none', borderRadius: '5px'}}>Go to Role Selection</a>
       </div>
     );
   }
 
-
+  // If all checks pass, render the main app structure (highly simplified)
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen bg-background">
-        <AppSidebar />
-        <SidebarInset>
-          <div className="flex flex-col flex-1">
-            <AppHeader />
-            <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
-              {/* DIAGNOSTIC DIV START - Helps confirm AppLayout structure renders */}
-              <div style={{ border: '5px solid limegreen', padding: '10px', backgroundColor: '#f0f0f0', marginBlockEnd: '20px', color: 'black' }}>
-                <p style={{ fontWeight: 'bold', fontSize: '1.2em' }}>AppLayout Diagnostic Info:</p>
-                <p>Current Path: {currentPath || 'N/A'}</p>
-                <p>User Profile Fetched: {userProfile ? 'Yes' : 'No'}</p>
-                <p>User Name: {userProfile?.name || 'N/A (or not fetched)'}</p>
-                <p>User Role: {userProfile?.role || 'N/A (or not fetched)'}</p>
-                <p>User Email: {userProfile?.email || 'N/A (or not fetched)'}</p>
-                <p>Attempting to render page content (children) below...</p>
-              </div>
-              {/* DIAGNOSTIC DIV END */}
-              {children}
-            </div>
-          </div>
-        </SidebarInset>
+    <div style={{ border: '10px solid green', padding: '20px', backgroundColor: 'lightgreen', minHeight: '100vh', color: 'black', fontFamily: 'monospace' }}>
+      <h1 style={{color: 'black', fontSize: '2em', fontWeight: 'bold'}}>AppLayout Rendered (Simplified)</h1>
+      <p style={{color: 'black'}}>Current Path: {currentPath || 'N/A'}</p>
+      <p style={{color: 'black'}}>User Profile Fetched: {userProfile ? 'Yes' : 'No'}</p>
+      <p style={{color: 'black'}}>User Name: {userProfile?.name || 'N/A (or not fetched)'}</p>
+      <p style={{color: 'black'}}>User Role: {userProfile?.role || 'N/A (or not fetched)'}</p>
+      <p style={{color: 'black'}}>User Email: {userProfile?.email || 'N/A (or not fetched)'}</p>
+      <hr style={{margin: '10px 0', borderColor: 'darkgreen'}} />
+      <div style={{ border: '5px solid blue', padding: '10px', marginTop: '10px', backgroundColor: 'lightblue' }}>
+        <h2 style={{color: 'black', fontWeight: 'bold'}}>Rendering Children (Actual Page Content) Below:</h2>
+        {children}
       </div>
-    </SidebarProvider>
+    </div>
   );
 }

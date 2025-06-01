@@ -13,16 +13,21 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
-      <div className="flex h-16 items-center justify-between"> {/* Removed container, px-4 md:px-6 */}
-        <div className="flex items-center gap-2 pl-1 md:pl-2"> {/* Changed: Added pl-1 md:pl-2 for finer control */}
+      <div className="flex h-16 items-center"> {/* Removed justify-between to manage spacing internally */}
+        {/* Sidebar Toggle Section - Fixed width to match collapsed sidebar */}
+        <div className="flex h-full w-12 items-center justify-center"> {/* w-12 is 3rem (var(--sidebar-width-icon)) */}
           <Button
             variant="ghost"
-            size="icon"
+            size="icon" // h-10 w-10 (2.5rem x 2.5rem)
             onClick={toggleSidebar}
           >
-            <Icons.menu className="h-5 w-5" />
+            <Icons.menu className="h-5 w-5" /> {/* Icon size */}
             <span className="sr-only">Toggle Menu</span>
           </Button>
+        </div>
+
+        {/* Logo and Site Name Section */}
+        <div className="flex items-center pl-2"> {/* Padding to space logo from toggle section */}
           <Link href="/dashboard" className="flex items-center gap-2">
             <Icons.logo className="h-6 w-6 text-primary" />
             <span className="hidden sm:inline font-bold text-primary">
@@ -31,8 +36,11 @@ export function AppHeader() {
           </Link>
         </div>
 
-        <div className="flex items-center space-x-2 sm:space-x-4 pr-4 md:pr-6"> {/* Added pr-4 md:pr-6 */}
-          {/* Search Bar (Optional - can be re-added here if needed) */}
+        {/* Spacer to push UserNav to the right */}
+        <div className="flex-grow" />
+
+        {/* UserNav Section */}
+        <div className="flex items-center space-x-2 sm:space-x-4 pr-4 md:pr-6">
           <UserNav />
         </div>
       </div>

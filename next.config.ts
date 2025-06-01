@@ -37,7 +37,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.async_hooks = false;
       config.resolve.fallback.fs = false;
       config.resolve.fallback.tls = false;
-      config.resolve.fallback.net = false; // Add net fallback
+      config.resolve.fallback.net = false;
+      config.resolve.fallback.http2 = false; // Added http2 fallback
     }
     // Important: return the modified config
     return config;

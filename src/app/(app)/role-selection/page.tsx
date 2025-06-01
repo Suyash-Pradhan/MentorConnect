@@ -22,8 +22,16 @@ export default function RoleSelectionPage() {
   const [selectedRole, setSelectedRole] = React.useState<Role | null>(null);
 
   const handleRoleSelection = async (role: 'student' | 'alumni') => {
-    if (isLoading || !MOCK_CURRENT_USER_ID) {
-      toast({ variant: "destructive", title: "Error", description: "User not authenticated or operation in progress." });
+    if (!MOCK_CURRENT_USER_ID || !MOCK_CURRENT_USER_EMAIL) {
+      toast({ variant: "destructive", title: "Configuration Error", description: "Mock user ID or email is not properly configured for this page." });
+      setIsLoading(false); // Ensure loading state is reset
+      return;
+    }
+    // Combined the isLoading check with the initial MOCK_CURRENT_USER_ID check.
+    // If MOCK_CURRENT_USER_ID was the problem, it's caught above.
+    // This check is for subsequent clicks while an operation is in progress.
+    if (isLoading) { 
+      toast({ variant: "destructive", title: "Error", description: "Operation already in progress." });
       return;
     }
     setSelectedRole(role);
@@ -36,10 +44,10 @@ export default function RoleSelectionPage() {
         // If profile doesn't exist, create a basic one
         userProfile = {
           id: MOCK_CURRENT_USER_ID,
-          email: MOCK_CURRENT_USER_EMAIL, // TODO: Get from auth
+          email: MOCK_CURRENT_USER_EMAIL, 
           role: role,
-          createdAt: new Date(), // Will be converted to serverTimestamp by setProfile if new
-          name: "", // User will fill this in "Edit Profile"
+          createdAt: new Date(), 
+          name: "", 
         };
       } else {
         userProfile.role = role;
@@ -75,19 +83,19 @@ export default function RoleSelectionPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-full py-12">
-      <Card className="w-full max-w-lg shadow-xl">
+    <div className="flex items-center justify-center min-h-full py-12 border-4 border-red-500 bg-yellow-100">
+      <Card className="w-full max-w-lg shadow-xl bg-card text-card-foreground">
         <CardHeader className="text-center">
           <Icons.logo className="mx-auto h-16 w-16 text-primary mb-4" />
           <CardTitle className="text-3xl">Welcome to MentorConnect!</CardTitle>
-          <CardDescription className="text-lg">
+          <CardDescription className="text-lg text-muted-foreground">
             Please select your role to continue. This will help us tailor your experience.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-8">
           <Button
             size="lg"
-            className="w-full py-8 text-xl bg-primary hover:bg-primary/90"
+            className="w-full py-8 text-xl bg-primary hover:bg-primary/90 text-primary-foreground"
             onClick={() => handleRoleSelection("student")}
             disabled={isLoading}
           >
@@ -101,7 +109,7 @@ export default function RoleSelectionPage() {
           <Button
             size="lg"
             variant="outline"
-            className="w-full py-8 text-xl border-primary text-primary hover:bg-primary/10"
+            className="w-full py-8 text-xl border-primary text-primary hover:bg-primary/10 hover:text-primary"
             onClick={() => handleRoleSelection("alumni")}
             disabled={isLoading}
           >
@@ -122,4 +130,3 @@ export default function RoleSelectionPage() {
     </div>
   );
 }
-

@@ -31,18 +31,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   try {
     userProfile = await getProfile(MOCK_CURRENT_USER_ID);
   } catch (error: any) {
-    console.error("AppLayout: Failed to fetch user profile:", error);
+    console.error("AppLayout: Failed to fetch user profile:", error); // This log helps identify Firebase issues
     profileError = true;
-    if (error.message && error.message.includes("offline")) {
-      profileErrorMessage = "Could not connect to the database (client is offline). Please ensure your internet connection is stable, the Cloud Firestore API is enabled for your project, and a Firestore database instance has been created in the Firebase console. It may take a few minutes for these services to become active after enabling them.";
+    if (error.code && error.code.includes("unavailable")) { // Firebase unavailable error
+        profileErrorMessage = "Could not connect to the database (client is offline or service unavailable). Please ensure your internet connection is stable, the Cloud Firestore API is enabled for your project, and a Firestore database instance has been created and is fully propagated in the Firebase console. It may take a few minutes (5-15+) for these services to become active after enabling them.";
     } else if (error.message && error.message.includes("PERMISSION_DENIED")) {
-      profileErrorMessage = "Permission denied when trying to access the database. Please check your Firestore security rules and ensure the Cloud Firestore API is enabled for your project in the Google Cloud Console.";
-    } else {
+      profileErrorMessage = "Permission denied when trying to access the database. Please check your Firestore security rules and ensure the Cloud Firestore API is enabled for your project in the Google Cloud Console and has had time to propagate (5-15+ min).";
+    } else if (error.message && error.message.includes("NEXT_PUBLIC_FIREBASE_API_KEY")) {
+        profileErrorMessage = `Firebase Initialization Failed: ${error.message}. Please ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set in your .env.local file and you've restarted your development server.`;
+    }
+     else {
       profileErrorMessage = `Could not load user profile due to an unexpected error: ${error.message || 'Unknown error'}. Please try again later or contact support.`;
     }
   }
 
-  const headersList = headers();
+  const headersList = await headers(); // Changed: await headers()
   const currentPath = headersList.get('next-url'); // Gets the current internal URL, e.g., /dashboard
 
   // If profile fetch failed or user exists but has no role, redirect to role selection,
@@ -65,7 +68,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <Link href="/login">Try Logging In Again</Link>
           </Button>
         </div>
-         <p className="text-sm text-muted-foreground mt-4">If this issue persists, please review your Firebase project setup and ensure all services are active.</p>
+         <p className="text-sm text-muted-foreground mt-4">If this issue persists, please review your Firebase project setup and ensure all services are active and have propagated. A server restart might also be necessary.</p>
       </div>
     );
   }
@@ -79,7 +82,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     // This case should ideally be caught by the redirect above if not on /role-selection
     // Or if somehow profileError was false, but userProfile is still null.
     // Fallback to a message or allow children if role selection is the next step.
-    // For safety, if we reach here and currentPath is NOT /role-selection but role is missing, show error.
      return (
       <div className="flex flex-col min-h-screen items-center justify-center bg-background p-4 text-center">
         <Icons.userCircle className="h-16 w-16 text-primary mb-4" />

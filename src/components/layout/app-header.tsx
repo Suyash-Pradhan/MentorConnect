@@ -13,22 +13,22 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
-      <div className="flex h-16 items-center"> {/* Main header container, h-16 (4rem) */}
+      <div className="flex h-16 items-center w-full"> {/* Added w-full here */}
         {/* Sidebar Toggle Section - Fixed width to match collapsed sidebar and vertically center button */}
         <div className="flex h-full w-12 items-center justify-center"> {/* w-12 is 3rem (var(--sidebar-width-icon)) */}
           <Button
             variant="ghost"
-            size="icon" // h-10 w-10 (2.5rem x 2.5rem)
+            size="icon" 
             onClick={toggleSidebar}
-            className="h-10 w-10" // Explicitly set size for centering within h-16 if needed
+            className="h-10 w-10" 
           >
-            <Icons.menu className="h-5 w-5" /> {/* Icon size */}
+            <Icons.menu className="h-5 w-5" /> 
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </div>
 
         {/* Logo and Site Name Section */}
-        <div className="flex items-center pl-2"> {/* Padding to space logo from toggle section */}
+        <div className="flex items-center pl-2"> 
           <Link href="/dashboard" className="flex items-center gap-2">
             <Icons.logo className="h-6 w-6 text-primary" />
             <span className="hidden sm:inline font-bold text-primary">

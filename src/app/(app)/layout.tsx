@@ -9,29 +9,26 @@ import { Button } from '@/components/ui/button';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
-import { SidebarInset } from '@/components/ui/sidebar'; // Import SidebarInset
+import { SidebarInset } from '@/components/ui/sidebar'; 
 import type { Profile } from '@/types';
 import { getProfile } from '@/services/profileService';
 
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // Can be "student123" or "alumni456" etc.
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   let userProfile: Profile | null = null;
   let profileError: Error | null = null;
-  const currentPath = ''; // Cannot get currentPath directly in Server Component layout easily without headers/middleware
-                          // For now, this means redirection logic might need refinement if path-dependent.
+  const currentPath = ''; 
 
   try {
     userProfile = await getProfile(MOCK_CURRENT_USER_ID);
   } catch (error: any) {
     console.error("[AppLayout] Error fetching profile:", error);
-    profileError = error; // Store the error to display it
+    profileError = error; 
   }
 
-  // Handle Firestore connection errors (PERMISSION_DENIED, client offline, etc.)
   if (profileError) {
-    const firebaseError = profileError as any; // Cast to any to access potential Firebase error properties
+    const firebaseError = profileError as any; 
     let errorTitle = "Application Error";
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
     let troubleshootingSteps: React.ReactNode[] = [];
@@ -61,7 +58,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ];
     }
 
-
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 md:p-8">
         <div className="max-w-2xl w-full bg-white shadow-2xl rounded-lg p-6 md:p-10 border-2 border-red-300">
@@ -89,37 +85,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-
-  // If profile exists but role is not set, and not already on role-selection page, redirect.
   if (userProfile && !userProfile.role && currentPath !== '/role-selection') {
-    // The redirect should happen client-side or via middleware for server components.
-    // For now, this logic might not work as expected in a pure server component layout.
-    // Consider moving role check to middleware or individual pages if this doesn't redirect reliably.
-    // console.log("[AppLayout] User profile exists but role not set, redirecting to /role-selection");
-    // redirect('/role-selection'); // This will throw an error if called during render of a server component not in a route handler.
-    // For now, we will allow rendering and let the RoleSelectionPage handle its logic.
-    // If a blank screen occurs, the RoleSelectionPage itself or a component it uses is the likely culprit.
+    // redirect('/role-selection'); // Server-side redirect, might need client-side for some cases
   }
 
-  // If no profile and not on role-selection (e.g., new user flow might be caught here, but auth should ideally handle this)
   if (!userProfile && currentPath !== '/role-selection') {
-      // This scenario should ideally be handled by auth. If a user reaches here without a profile,
-      // they might need to be redirected to a login or signup page, or role selection if auth is partial.
-      // For now, assuming role-selection is the catch-all for new/incomplete profiles.
-      // If on any other page, and no profile, redirecting to role-selection might be appropriate.
-      // However, this could loop if role-selection also requires a profile that can't be fetched.
-      // console.log("[AppLayout] No user profile found, redirecting to /role-selection");
-      // redirect('/role-selection');
+    // redirect('/role-selection'); // Server-side redirect
   }
-
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col w-full"> {/* Added w-full here */}
         <AppHeader />
-        <div className="flex flex-1 w-full"> {/* Ensures this flex container takes full width */}
+        <div className="flex flex-1 w-full"> 
           <AppSidebar />
-          <SidebarInset className="p-4 md:p-6 lg:p-8"> {/* SidebarInset handles its own growth */}
+          <SidebarInset className="p-4 md:p-6 lg:p-8">
             {children}
           </SidebarInset>
         </div>

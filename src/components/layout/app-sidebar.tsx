@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,15 +26,10 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left">
-      <SidebarHeader className="p-2 flex items-center justify-between">
-        {(state === 'expanded' || isMobile) && (
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Icons.logo className="h-7 w-7 text-sidebar-primary" />
-            <span className="text-xl font-bold text-sidebar-foreground">{siteConfig.name}</span>
-          </Link>
-        )}
-        {/* The trigger is usually in the header, but can be here if needed for some designs */}
-        {/* <SidebarTrigger className="ml-auto data-[state=open]:hidden" /> */}
+      <SidebarHeader className="p-2 h-12 flex items-center">
+        {/* Removed site name and logo link from here to avoid duplication with AppHeader. */}
+        {/* This space can be used for a sidebar-specific control or left minimal. */}
+        {/* Example: If sidebar had its own internal trigger, it might go here. */}
       </SidebarHeader>
       
       <SidebarContent className="flex-1 p-0">

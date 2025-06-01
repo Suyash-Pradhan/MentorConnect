@@ -19,7 +19,7 @@ export function AppHeader() {
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="mr-1 sm:mr-2" // Adjusted margin for tighter spacing on small screens
+            // Removed className="mr-1 sm:mr-2" to make it flush left in its group
           >
             <Icons.menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>

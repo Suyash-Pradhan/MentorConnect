@@ -68,18 +68,15 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobileHookValue = useIsMobile(); // Will be undefined SSR, then boolean client-side
+    const isMobileHookValue = useIsMobile(); 
     const [mounted, setMounted] = React.useState(false);
 
-    // Initialize _open with defaultOpen for consistent SSR and initial client render
     const [_open, _setOpen] = React.useState(defaultOpen);
 
     React.useEffect(() => {
-      setMounted(true); // Set mounted to true only on the client
+      setMounted(true); 
     }, []);
 
-    // Effect to read cookie and update _open on client side after hydration,
-    // only if not controlled and on desktop.
     React.useEffect(() => {
       if (mounted && openProp === undefined && !isMobileHookValue && typeof document !== "undefined") {
         const cookieValue = document.cookie
@@ -94,7 +91,6 @@ const SidebarProvider = React.forwardRef<
 
     const currentOpenState = openProp !== undefined ? openProp : _open;
 
-    // Effect to update cookie when 'open' state (desktop) changes and it's not controlled externally
     React.useEffect(() => {
       if (mounted && openProp === undefined && !isMobileHookValue && typeof document !== "undefined") {
         document.cookie = `${SIDEBAR_COOKIE_NAME}=${currentOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
@@ -136,7 +132,7 @@ const SidebarProvider = React.forwardRef<
     }, [mounted, toggleSidebar]);
 
     const state = currentOpenState ? "expanded" : "collapsed";
-    const contextIsMobile = mounted ? !!isMobileHookValue : false; // Ensure false for SSR/initial client
+    const contextIsMobile = mounted ? !!isMobileHookValue : false; 
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
@@ -220,10 +216,6 @@ const Sidebar = React.forwardRef<
     }
 
     if (!hasMounted) {
-        // Render nothing or a placeholder on the server and initial client render
-        // to ensure consistency before client-side mobile check.
-        // This ensures the structure rendered by server (which sees isMobile as false)
-        // matches the initial client structure.
         return null; 
     }
 
@@ -256,7 +248,6 @@ const Sidebar = React.forwardRef<
         data-variant={variant}
         data-side={side}
       >
-        {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
             "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
@@ -273,7 +264,6 @@ const Sidebar = React.forwardRef<
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-            // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
               : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -618,7 +608,8 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={(state !== "collapsed" && state !== "expanded") || isMobile || state === "expanded"} // Hide if not collapsed OR if mobile OR if expanded (for icon only tooltips)
+          // Show tooltip only when sidebar is collapsed and on desktop
+          hidden={isMobile || state === 'expanded'} 
           {...tooltip}
         />
       </Tooltip>

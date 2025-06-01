@@ -27,9 +27,6 @@ export default function RoleSelectionPage() {
       setIsLoading(false); // Ensure loading state is reset
       return;
     }
-    // Combined the isLoading check with the initial MOCK_CURRENT_USER_ID check.
-    // If MOCK_CURRENT_USER_ID was the problem, it's caught above.
-    // This check is for subsequent clicks while an operation is in progress.
     if (isLoading) { 
       toast({ variant: "destructive", title: "Error", description: "Operation already in progress." });
       return;
@@ -41,7 +38,6 @@ export default function RoleSelectionPage() {
       let userProfile = await getProfile(MOCK_CURRENT_USER_ID);
 
       if (!userProfile) {
-        // If profile doesn't exist, create a basic one
         userProfile = {
           id: MOCK_CURRENT_USER_ID,
           email: MOCK_CURRENT_USER_EMAIL, 
@@ -53,13 +49,12 @@ export default function RoleSelectionPage() {
         userProfile.role = role;
       }
 
-      // Initialize or update role-specific profile
       if (role === 'student') {
         userProfile.studentProfile = userProfile.studentProfile || await initializeRoleProfile('student');
-        userProfile.alumniProfile = undefined; // Clear other role's profile
+        userProfile.alumniProfile = undefined; 
       } else {
         userProfile.alumniProfile = userProfile.alumniProfile || await initializeRoleProfile('alumni');
-        userProfile.studentProfile = undefined; // Clear other role's profile
+        userProfile.studentProfile = undefined; 
       }
       
       await setProfile(MOCK_CURRENT_USER_ID, userProfile);
@@ -83,7 +78,9 @@ export default function RoleSelectionPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-full py-12 border-4 border-red-500 bg-yellow-100">
+    // Removed debug-like styling from this div (border-4 border-red-500 bg-yellow-100)
+    // AuthLayout already provides centering and min-h-screen
+    <div className="flex items-center justify-center w-full py-12"> 
       <Card className="w-full max-w-lg shadow-xl bg-card text-card-foreground">
         <CardHeader className="text-center">
           <Icons.logo className="mx-auto h-16 w-16 text-primary mb-4" />

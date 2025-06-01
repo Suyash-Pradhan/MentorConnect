@@ -227,7 +227,7 @@ const Sidebar = React.forwardRef<
             data-mobile="true"
             className={cn(
               "w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
-              "top-16 h-[calc(100vh_-_4rem)]" // Adjust top and height for mobile sheet
+              "top-16 h-[calc(100vh_-_4rem)]"
             )}
             style={
               {
@@ -245,15 +245,16 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className="group peer hidden md:block text-sidebar-foreground" // This is the placeholder div
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
       >
+        {/* This inner div dictates the width of the placeholder */}
         <div
           className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
+            "duration-200 relative h-[calc(100vh_-_4rem)] top-16 w-[--sidebar-width] bg-transparent transition-[width] ease-linear", // Adjusted height and top
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -261,10 +262,11 @@ const Sidebar = React.forwardRef<
               : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
           )}
         />
+        {/* This is the actual visible sidebar, positioned fixed */}
         <div
           className={cn(
             "duration-200 fixed z-10 hidden md:flex transition-[left,right,width] ease-linear",
-            "top-16 bottom-0 h-[calc(100vh_-_4rem)] w-[--sidebar-width]", // Adjust top, bottom, and height for desktop fixed
+            "top-16 bottom-0 h-[calc(100vh_-_4rem)] w-[--sidebar-width]", // Adjusted top, bottom and height
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -351,7 +353,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background overflow-y-auto",
+        "relative flex flex-col min-h-svh flex-grow w-full basis-auto bg-background overflow-y-auto", // Use flex-grow, w-full, basis-auto
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)] md:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width)_+_theme(spacing.2))] md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className
       )}

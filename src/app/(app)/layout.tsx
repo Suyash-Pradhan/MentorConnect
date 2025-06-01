@@ -117,9 +117,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <div className="flex min-h-screen flex-col">
         <AppHeader />
-        <div className="flex flex-1">
+        <div className="flex flex-1 w-full"> {/* Ensures this flex container takes full width */}
           <AppSidebar />
-          <SidebarInset className="p-4 md:p-6 lg:p-8"> {/* Apply padding directly to SidebarInset */}
+          <SidebarInset className="p-4 md:p-6 lg:p-8"> {/* SidebarInset handles its own growth */}
             {children}
           </SidebarInset>
         </div>

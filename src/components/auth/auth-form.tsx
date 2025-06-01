@@ -66,9 +66,9 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
         const newProfile: Profile = {
           id: firebaseUser.uid,
-          email: firebaseUser.email || data.email, // Use actual email from auth
+          email: firebaseUser.email || data.email, 
           role: null, 
-          name: firebaseUser.displayName || "", // Use display name from auth if available, else empty
+          name: firebaseUser.displayName || "", 
           avatarUrl: firebaseUser.photoURL || "",
           createdAt: new Date(), 
         };
@@ -90,9 +90,8 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             title: "Login Successful!",
             description: "Welcome back to MentorConnect.",
           });
-          // If name is missing even after login and role is set, guide to profile to complete it.
           if (!userProfile.name) {
-            router.push("/profile?edit=true"); // Add a query param to suggest opening edit
+            router.push("/profile?edit=true"); 
           } else {
             router.push("/dashboard");
           }
@@ -115,7 +114,14 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         }
       }
     } catch (error: any) {
-      console.error("Authentication error:", error);
+      // Conditionally log the error.
+      // We don't need to log the full FirebaseError object to the console for "auth/email-already-in-use"
+      // as it's a common, handled case and the toast informs the user.
+      // This might help reduce Next.js dev overlay noise for this specific error.
+      if (error.code !== "auth/email-already-in-use") {
+        console.error("Authentication error:", error);
+      }
+
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code) {
         switch (error.code) {

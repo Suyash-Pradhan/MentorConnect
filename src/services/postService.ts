@@ -133,7 +133,7 @@ export async function getPostsByAuthor(authorId: string): Promise<Post[]> {
       posts.push({ id: doc.id, ...convertTimestampsToDates(doc.data()) } as Post);
     });
     return posts;
-  } catch (error) MuiDialog-paper
+  } catch (error) {
     console.error(`Error fetching posts for author ${authorId}:`, error);
     throw error;
   }
@@ -171,3 +171,4 @@ export async function deletePost(postId: string): Promise<void> {
     throw error;
   }
 }
+

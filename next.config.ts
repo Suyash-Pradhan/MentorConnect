@@ -39,7 +39,9 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
       config.resolve.fallback.http2 = false;
-      config.resolve.fallback.dns = false; // Added dns fallback
+      config.resolve.fallback.dns = false;
+      config.resolve.fallback.child_process = false; // Added child_process fallback
+      config.resolve.fallback.perf_hooks = false;   // Added perf_hooks fallback
     }
     // Important: return the modified config
     return config;

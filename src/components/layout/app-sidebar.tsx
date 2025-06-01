@@ -26,10 +26,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="left">
-      <SidebarHeader className="p-2 h-12 flex items-center">
-        {/* Removed site name and logo link from here to avoid duplication with AppHeader. */}
-        {/* This space can be used for a sidebar-specific control or left minimal. */}
-        {/* Example: If sidebar had its own internal trigger, it might go here. */}
+      <SidebarHeader className="p-0 flex items-center h-auto min-h-[1px]"> {/* Changed: p-0, h-auto, min-h-[1px] to ensure it collapses if empty */}
+        {/* This space is minimal if no content is added here. */}
       </SidebarHeader>
       
       <SidebarContent className="flex-1 p-0">
@@ -46,3 +44,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

@@ -13,13 +13,12 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
-      <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-        <div className="flex items-center gap-2">
+      <div className="flex h-16 items-center justify-between"> {/* Removed container, px-4 md:px-6 */}
+        <div className="flex items-center gap-2 pl-1 md:pl-2"> {/* Changed: Added pl-1 md:pl-2 for finer control */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            // Removed className="mr-1 sm:mr-2" to make it flush left in its group
           >
             <Icons.menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
@@ -32,14 +31,8 @@ export function AppHeader() {
           </Link>
         </div>
 
-        <div className="flex items-center space-x-2 sm:space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4 pr-4 md:pr-6"> {/* Added pr-4 md:pr-6 */}
           {/* Search Bar (Optional - can be re-added here if needed) */}
-          {/* Example:
-          <div className="hidden md:flex items-center space-x-1 border rounded-md px-2">
-            <Icons.search className="h-4 w-4 text-muted-foreground" />
-            <Input type="search" placeholder="Search..." className="h-8 border-none focus-visible:ring-0 focus-visible:ring-offset-0 !shadow-none" />
-          </div>
-          */}
           <UserNav />
         </div>
       </div>

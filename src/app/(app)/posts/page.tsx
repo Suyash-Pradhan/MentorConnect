@@ -3,7 +3,7 @@
 
 import React from 'react';
 import type { Post } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription, CardFooter as not used directly in this component for the items
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -211,3 +211,4 @@ const PostCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
+

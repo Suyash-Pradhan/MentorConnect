@@ -5,55 +5,78 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
-
-// Debug log for environment variables
-console.log("[FirebaseSetup] Attempting to read Firebase env values from process.env:", {
-  NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-  GOOGLE_API_KEY: process.env.GOOGLE_API_KEY, // Also log this for Genkit if needed
-});
+import { Timestamp, serverTimestamp, type FieldValue } from 'firebase/firestore';
 
 
-// Environment variables that *must* be defined in your .env file at the project root.
-const requiredEnvVars: Record<string, string> = {
-  NEXT_PUBLIC_FIREBASE_API_KEY: 'apiKey',
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'authDomain',
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'projectId',
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'storageBucket',
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 'messagingSenderId',
-  NEXT_PUBLIC_FIREBASE_APP_ID: 'appId',
+// Log the raw values at the very start to see what's available when the module loads
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_API_KEY: ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_APP_ID: ${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}`);
+console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}`);
+
+
+const configValues = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // This one is optional
 };
 
-const missingVars: string[] = [];
+const criticalKeysMap: { [key in keyof Omit<typeof configValues, 'measurementId'>]: string } = {
+    apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
+    authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+    projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+    storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+    messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+    appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
+};
 
-for (const [envVar, configKey] of Object.entries(requiredEnvVars)) {
-  if (!process.env[envVar]) {
-    missingVars.push(`${envVar} (for Firebase config key "${configKey}", current value: ${process.env[envVar]})`);
-  }
+const missingCriticalValues: string[] = [];
+
+for (const key of Object.keys(criticalKeysMap) as (keyof typeof criticalKeysMap)[]) {
+    if (!configValues[key]) { // Check if the value derived directly from process.env.VAR_NAME is falsy
+        missingCriticalValues.push(
+          `${key} (expected from ${criticalKeysMap[key]}, received: ${configValues[key]})`
+        );
+    }
 }
 
-if (missingVars.length > 0) {
-  const errorMessage = `Firebase config error: The following environment variable(s) are MISSING or UNDEFINED: \n- ${missingVars.join('\n- ')}\n` +
-  `Please ensure they are correctly set in your .env (or .env.local) file at the ROOT of your project. After adding/editing, you MUST restart your Next.js development server.`;
-  console.error(`[FirebaseSetup] CRITICAL_ERROR: ${errorMessage}`);
-  // Throw an error to make it very clear during development, especially if it's a critical config like API key
-  throw new Error(`[FirebaseSetup] Firebase Initialization Failed due to missing environment variables: ${missingVars.join(', ')}. Check server logs and your .env (or .env.local) file.`);
+if (missingCriticalValues.length > 0) {
+    const errorIntro = "[FirebaseSetup] CRITICAL_ERROR: Firebase Initialization Failed. The following required configuration values are missing or undefined:\n";
+    const errorDetails = missingCriticalValues.map(detail => `- ${detail}`).join("\n");
+    const errorGuidance = "\nPlease ensure the corresponding NEXT_PUBLIC_ environment variables are correctly set in your .env.local file (at the project root) and that you have RESTARTED your Next.js development server.";
+    const fullErrorMessage = errorIntro + errorDetails + errorGuidance;
+    
+    console.error(fullErrorMessage);
+    // Also log the state of process.env again, right before throwing, for direct comparison with initial logs
+    console.error("[FirebaseSetup] process.env state at time of error check:", {
+        NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    });
+    throw new Error(fullErrorMessage);
 }
 
+console.log("[FirebaseSetup] All critical Firebase configuration values appear to be present. Proceeding with initialization.");
 
+// Build the final config using the validated values
 const firebaseConfig = {
-  apiKey:process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    apiKey: configValues.apiKey!,
+    authDomain: configValues.authDomain!,
+    projectId: configValues.projectId!,
+    storageBucket: configValues.storageBucket!,
+    messagingSenderId: configValues.messagingSenderId!,
+    appId: configValues.appId!,
+    measurementId: configValues.measurementId, // Optional
 };
 
 let app: FirebaseApp;
@@ -63,7 +86,7 @@ if (!getApps().length) {
     console.log('[FirebaseSetup] Firebase app initialized successfully.');
   } catch (e: any) {
     console.error("[FirebaseSetup] CRITICAL_ERROR: Failed to initialize Firebase app with the provided config:", e.message);
-    console.error("[FirebaseSetup] Firebase Config Used:", firebaseConfig);
+    console.error("[FirebaseSetup] Firebase Config Used for initializeApp:", firebaseConfig);
     throw new Error(`[FirebaseSetup] Failed to initialize Firebase app. Ensure config is correct and project is set up. Original error: ${e.message}`);
   }
 } else {
@@ -74,4 +97,34 @@ if (!getApps().length) {
 const db: Firestore = getFirestore(app);
 const auth: Auth = getAuth(app);
 
-export { app, db, auth };
+// Helper to convert Firestore Timestamps to Dates in a nested object
+export function convertTimestampsToDates(data: any): any {
+  if (!data) return data;
+  const newData = { ...data };
+  for (const key in newData) {
+    if (newData[key] instanceof Timestamp) {
+      newData[key] = newData[key].toDate();
+    } else if (typeof newData[key] === 'object' && newData[key] !== null && !Array.isArray(newData[key])) {
+      newData[key] = convertTimestampsToDates(newData[key]);
+    }
+  }
+  return newData;
+}
+
+// Helper to convert Dates to Firestore Timestamps in a nested object
+export function convertDatesToTimestamps(data: any): any {
+  if (!data) return data;
+  const newData = { ...data };
+  for (const key in newData) {
+    if (newData[key] instanceof Date) {
+      newData[key] = Timestamp.fromDate(newData[key] as Date);
+    } else if (typeof newData[key] === 'object' && newData[key] !== null && !Array.isArray(newData[key])) {
+      newData[key] = convertDatesToTimestamps(newData[key]);
+    }
+  }
+  return newData;
+}
+
+
+export { app, db, auth, serverTimestamp, Timestamp, type FieldValue };
+

@@ -35,13 +35,15 @@ const nextConfig: NextConfig = {
       // Initialize fallback if it doesn't exist, then add specific fallbacks
       config.resolve.fallback = config.resolve.fallback || {};
       config.resolve.fallback.async_hooks = false;
+      config.resolve.fallback['node:async_hooks'] = false; // Added for node: prefix
       config.resolve.fallback.fs = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
       config.resolve.fallback.http2 = false;
       config.resolve.fallback.dns = false;
-      config.resolve.fallback.child_process = false; // Added child_process fallback
-      config.resolve.fallback.perf_hooks = false;   // Added perf_hooks fallback
+      config.resolve.fallback.child_process = false;
+      config.resolve.fallback.perf_hooks = false;
+      config.resolve.fallback['node:perf_hooks'] = false; // Added for node: prefix
     }
     // Important: return the modified config
     return config;

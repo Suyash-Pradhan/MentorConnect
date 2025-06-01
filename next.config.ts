@@ -32,12 +32,10 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Prevent Node.js built-ins from being bundled on the client
-      config.resolve.fallback = {
-        ...config.resolve.fallback, // Spread existing fallbacks
-        async_hooks: false,
-        fs: false, // Add fs fallback
-      };
+      // Initialize fallback if it doesn't exist, then add specific fallbacks
+      config.resolve.fallback = config.resolve.fallback || {};
+      config.resolve.fallback.async_hooks = false;
+      config.resolve.fallback.fs = false;
     }
     // Important: return the modified config
     return config;

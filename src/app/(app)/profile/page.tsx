@@ -114,7 +114,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-6 space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex justify-between items-center">
           <Skeleton className="h-9 w-40" />
           <Skeleton className="h-9 w-24" />
@@ -126,7 +126,7 @@ export default function ProfilePage() {
 
   if (!profileData) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-6 text-center">
+      <div className="w-full text-center">
         <p>No profile data found. You might need to log in or complete initial setup.</p>
       </div>
     );
@@ -142,7 +142,7 @@ export default function ProfilePage() {
 
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6">
+    <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
         <div className="flex items-center gap-2">

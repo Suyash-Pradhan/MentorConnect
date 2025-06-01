@@ -116,7 +116,7 @@ export default function MentorshipPage() {
 
   if (isLoading && !currentUserProfile) {
      return (
-      <div className="container mx-auto py-8 px-4 md:px-6">
+      <div className="w-full">
         <Skeleton className="h-10 w-3/4 mb-2" />
         <Skeleton className="h-6 w-1/2 mb-8" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
@@ -128,7 +128,7 @@ export default function MentorshipPage() {
 
   if (!currentUserProfile?.role) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-6 text-center">
+      <div className="w-full text-center">
         <Icons.warning className="mx-auto h-16 w-16 text-destructive mb-4" />
         <p className="text-lg text-muted-foreground">Your role is not set. Please update your profile.</p>
         <Button asChild className="mt-4"><Link href="/profile">Go to Profile</Link></Button>
@@ -138,7 +138,7 @@ export default function MentorshipPage() {
 
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6">
+    <div className="w-full">
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-foreground">Mentorship Dashboard</h1>
         <p className="text-lg text-muted-foreground">

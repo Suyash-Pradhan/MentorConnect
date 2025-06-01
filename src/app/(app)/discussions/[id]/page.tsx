@@ -113,7 +113,7 @@ export default function SingleDiscussionPage() {
 
   if (!thread) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-6 text-center">
+      <div className="w-full text-center">
         <Button variant="outline" asChild className="mb-8 inline-flex items-center">
           <Link href="/discussions"><Icons.chevronLeft className="mr-2 h-4 w-4" /> Back to Discussions</Link>
         </Button>
@@ -129,7 +129,7 @@ export default function SingleDiscussionPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6">
+    <div className="w-full">
       <Button variant="outline" asChild className="mb-6">
         <Link href="/discussions"><Icons.chevronLeft className="mr-2 h-4 w-4" /> Back to Discussions</Link>
       </Button>
@@ -240,7 +240,7 @@ function CommentCard({ comment }: { comment: ThreadCommentType }) {
 }
 
 const DiscussionPageSkeleton = () => (
-  <div className="container mx-auto py-8 px-4 md:px-6">
+  <div className="w-full">
     <Skeleton className="h-9 w-40 mb-6" />
     <Card className="shadow-lg mb-8">
       <CardHeader className="pb-4">

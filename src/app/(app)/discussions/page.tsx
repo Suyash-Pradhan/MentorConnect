@@ -112,7 +112,7 @@ export default function DiscussionsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4 md:px-6">
+      <div className="w-full">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <Skeleton className="h-10 w-64 mb-2" />
@@ -129,7 +129,7 @@ export default function DiscussionsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6">
+    <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-4xl font-bold text-foreground">Discussions</h1>

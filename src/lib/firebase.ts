@@ -2,26 +2,11 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
-import { config as dotenvConfig } from 'dotenv';
-import path from 'path'; // Import path module
+// Removed: import { config as dotenvConfig } from 'dotenv';
+// Removed: import path from 'path';
 
-// Attempt to explicitly load .env.local if running on the server
-// This is a fallback/diagnostic for environments where Next.js automatic .env.local loading might be problematic.
-if (typeof window === 'undefined') {
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  console.log(`[FirebaseSetup] Attempting to load environment variables from: ${envPath}`);
-  const result = dotenvConfig({ path: envPath });
-
-  if (result.error) {
-    console.warn(`[FirebaseSetup] Explicit .env.local loading failed: ${result.error.message}. Relying on Next.js built-in environment variable loading.`);
-  } else {
-    if (result.parsed && Object.keys(result.parsed).length > 0) {
-      console.log('[FirebaseSetup] .env.local loaded explicitly. Parsed variables:', Object.keys(result.parsed));
-    } else {
-      console.warn('[FirebaseSetup] .env.local was found and read by dotenv, but no variables were parsed. Check file content and format.');
-    }
-  }
-}
+// Removed the explicit .env.local loading block that was here.
+// Next.js handles .env.local loading automatically.
 
 // Environment variables to check
 const envVarsToCheck: Record<string, string> = {

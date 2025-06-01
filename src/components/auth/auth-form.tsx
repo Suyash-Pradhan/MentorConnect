@@ -21,15 +21,29 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase"; // Import Firebase auth instance
-import { 
-  createUserWithEmailAndPassword, 
+import { auth } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   setPersistence,
-  browserLocalPersistence 
+  browserLocalPersistence,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { getProfile, setProfile } from "@/services/profileService";
 import type { Profile } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -46,6 +60,10 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = React.useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = React.useState("");
+  const [isResetLoading, setIsResetLoading] = React.useState(false);
 
   const form = useForm<UserFormValue>({
     resolver: zodResolver(formSchema),
@@ -66,11 +84,11 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
         const newProfile: Profile = {
           id: firebaseUser.uid,
-          email: firebaseUser.email || data.email, 
-          role: null, 
-          name: firebaseUser.displayName || "", 
+          email: firebaseUser.email || data.email,
+          role: null,
+          name: firebaseUser.displayName || "",
           avatarUrl: firebaseUser.photoURL || "",
-          createdAt: new Date(), 
+          createdAt: new Date(), // Will be converted to serverTimestamp by setProfile if new
         };
         await setProfile(firebaseUser.uid, newProfile);
 
@@ -82,7 +100,6 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
       } else { // Login
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
-
         const userProfile = await getProfile(firebaseUser.uid);
 
         if (userProfile && userProfile.role) {
@@ -91,7 +108,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             description: "Welcome back to MentorConnect.",
           });
           if (!userProfile.name) {
-            router.push("/profile?edit=true"); 
+            router.push("/profile?edit=true");
           } else {
             router.push("/dashboard");
           }
@@ -100,7 +117,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             title: "Login Successful!",
             description: "Please select your role to continue.",
           });
-           if (!userProfile) {
+           if (!userProfile) { // Should not happen if signup is robust
              const profileToEnsure: Profile = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || data.email,
@@ -114,14 +131,6 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         }
       }
     } catch (error: any) {
-      // Conditionally log the error.
-      // We don't need to log the full FirebaseError object to the console for "auth/email-already-in-use"
-      // as it's a common, handled case and the toast informs the user.
-      // This might help reduce Next.js dev overlay noise for this specific error.
-      if (error.code !== "auth/email-already-in-use") {
-        console.error("Authentication error:", error);
-      }
-
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code) {
         switch (error.code) {
@@ -132,7 +141,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             errorMessage = "The email address is not valid.";
             break;
           case "auth/operation-not-allowed":
-            errorMessage = "Email/password accounts are not enabled.";
+            errorMessage = "Email/password accounts are not enabled. Check Firebase console.";
             break;
           case "auth/weak-password":
             errorMessage = "The password is too weak.";
@@ -146,8 +155,13 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             errorMessage = "Invalid email or password.";
             break;
           default:
+            if (error.code !== "auth/email-already-in-use") {
+              console.error("Authentication error:", error);
+            }
             errorMessage = error.message || errorMessage;
         }
+      } else {
+        console.error("Authentication error:", error);
       }
       toast({
         variant: "destructive",
@@ -159,76 +173,218 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
     }
   };
 
+  const handlePasswordResetRequest = async () => {
+    if (!forgotPasswordEmail.trim()) {
+      toast({ variant: "destructive", title: "Email Required", description: "Please enter your email address." });
+      return;
+    }
+    setIsResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, forgotPasswordEmail.trim());
+      toast({ title: "Password Reset Email Sent", description: "If an account exists for this email, a reset link has been sent." });
+      setIsForgotPasswordOpen(false);
+      setForgotPasswordEmail("");
+    } catch (error: any) {
+      let Fmessage = "Failed to send password reset email. Please try again.";
+      if (error.code === "auth/user-not-found") {
+          Fmessage = "No user found with this email address.";
+      } else if (error.code === "auth/invalid-email") {
+          Fmessage = "The email address is not valid.";
+      } else {
+        console.error("Password reset error:", error);
+      }
+      toast({ variant: "destructive", title: "Error", description: Fmessage });
+    } finally {
+      setIsResetLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const firebaseUser = userCredential.user;
+
+      let userProfile = await getProfile(firebaseUser.uid);
+
+      if (!userProfile) {
+        const newProfile: Profile = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email!,
+          name: firebaseUser.displayName || "",
+          avatarUrl: firebaseUser.photoURL || "",
+          role: null,
+          createdAt: new Date(),
+        };
+        await setProfile(firebaseUser.uid, newProfile);
+        toast({ title: "Signed in with Google", description: "Please select your role to complete your profile." });
+        router.push("/role-selection");
+      } else {
+        if (userProfile.role) {
+          toast({ title: "Signed in with Google", description: `Welcome back, ${userProfile.name || 'User'}!` });
+           if (!userProfile.name) {
+            router.push("/profile?edit=true");
+          } else {
+            router.push("/dashboard");
+          }
+        } else {
+          toast({ title: "Signed in with Google", description: "Please select your role to continue." });
+          router.push("/role-selection");
+        }
+      }
+    } catch (error: any) {
+      console.error("Google Sign-In error:", error);
+      let gMessage = "Could not sign in with Google. Please try again.";
+      if (error.code === 'auth/popup-closed-by-user') {
+        gMessage = "Google Sign-In cancelled.";
+      } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/unauthorized-domain') {
+        gMessage = "Google Sign-In is not enabled for this app. Please contact support or check Firebase console setup.";
+      }
+      toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage });
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+
   return (
-    <Card className="shadow-xl">
-      <CardHeader>
-        <CardTitle className="text-2xl">{isSignUp ? "Create an Account" : "Welcome Back!"}</CardTitle>
-        <CardDescription>
-          {isSignUp ? "Enter your email and password to sign up." : "Enter your credentials to access your account."}
-        </CardDescription>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="name@example.com"
-                      disabled={isLoading}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+    <>
+      <Card className="shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-2xl">{isSignUp ? "Create an Account" : "Welcome Back!"}</CardTitle>
+          <CardDescription>
+            {isSignUp ? "Enter your email and password to sign up." : "Enter your credentials to access your account."}
+          </CardDescription>
+        </CardHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="name@example.com"
+                        disabled={isLoading || isGoogleLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" disabled={isLoading || isGoogleLoading} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {!isSignUp && (
+                <div className="text-right text-sm">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 h-auto font-normal text-muted-foreground hover:text-primary"
+                    onClick={() => setIsForgotPasswordOpen(true)}
+                    disabled={isLoading || isGoogleLoading}
+                  >
+                    Forgot Password?
+                  </Button>
+                </div>
               )}
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+              <Button disabled={isLoading || isGoogleLoading} className="w-full" type="submit">
+                {(isLoading) && (
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {isSignUp ? "Sign Up" : "Login"}
+              </Button>
+
+              <div className="relative w-full">
+                <Separator />
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">OR</span>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isGoogleLoading}
+              >
+                {isGoogleLoading ? (
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.google className="mr-2 h-4 w-4" />
+                )}
+                Sign in with Google
+              </Button>
+
+              <p className="mt-2 text-center text-sm text-muted-foreground">
+                {isSignUp ? (
+                  <>
+                    Already have an account?{" "}
+                    <Link href="/login" className="font-medium text-primary hover:underline">
+                      Login
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    Don&apos;t have an account?{" "}
+                    <Link href="/signup" className="font-medium text-primary hover:underline">
+                      Sign Up
+                    </Link>
+                  </>
+                )}
+              </p>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
+
+      <AlertDialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Your Password</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter your email address associated with your account, and we&apos;ll send you a link to reset your password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <FormLabel htmlFor="forgot-email">Email</FormLabel>
+            <Input
+              id="forgot-email"
+              type="email"
+              placeholder="name@example.com"
+              value={forgotPasswordEmail}
+              onChange={(e) => setForgotPasswordEmail(e.target.value)}
+              disabled={isResetLoading}
+              className="mt-1"
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-          <CardFooter className="flex flex-col">
-            <Button disabled={isLoading} className="w-full" type="submit">
-              {isLoading && (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {isSignUp ? "Sign Up" : "Login"}
-            </Button>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              {isSignUp ? (
-                <>
-                  Already have an account?{" "}
-                  <Link href="/login" className="font-medium text-primary hover:underline">
-                    Login
-                  </Link>
-                </>
-              ) : (
-                <>
-                  Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-medium text-primary hover:underline">
-                    Sign Up
-                  </Link>
-                </>
-              )}
-            </p>
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResetLoading} onClick={() => { setForgotPasswordEmail(""); setIsForgotPasswordOpen(false); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePasswordResetRequest} disabled={isResetLoading || !forgotPasswordEmail.trim()}>
+              {isResetLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
+              Send Reset Link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

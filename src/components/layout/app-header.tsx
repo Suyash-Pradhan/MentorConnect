@@ -13,13 +13,14 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
-      <div className="flex h-16 items-center"> {/* Removed justify-between to manage spacing internally */}
-        {/* Sidebar Toggle Section - Fixed width to match collapsed sidebar */}
+      <div className="flex h-16 items-center"> {/* Main header container, h-16 (4rem) */}
+        {/* Sidebar Toggle Section - Fixed width to match collapsed sidebar and vertically center button */}
         <div className="flex h-full w-12 items-center justify-center"> {/* w-12 is 3rem (var(--sidebar-width-icon)) */}
           <Button
             variant="ghost"
             size="icon" // h-10 w-10 (2.5rem x 2.5rem)
             onClick={toggleSidebar}
+            className="h-10 w-10" // Explicitly set size for centering within h-16 if needed
           >
             <Icons.menu className="h-5 w-5" /> {/* Icon size */}
             <span className="sr-only">Toggle Menu</span>

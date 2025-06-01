@@ -52,7 +52,7 @@ export function MainNav({ items, userRole }: MainNavProps) {
 
 
   return (
-    <ScrollArea className={cn("h-full", {"p-2": sidebarState === 'expanded' || isMobile })}>
+    <ScrollArea className={cn("h-full p-2")}> {/* Consistently apply p-2 for padding */}
       <SidebarMenu>
         {filteredItems.map((item, index) =>
           item.href ? (

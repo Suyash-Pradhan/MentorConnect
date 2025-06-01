@@ -64,18 +64,19 @@ export interface Post {
   externalLinkUrl?: string;
   externalLinkText?: string;
   likesCount: number;
+  likedBy: string[]; // Array of user IDs who liked the post
   commentsCount: number;
   createdAt: Date;
   updatedAt?: Date;
 }
 
-export interface Comment {
+export interface PostComment { // Renamed from Comment for clarity if original Comment type is used elsewhere
   id: string;
-  threadId: string; // Added to explicitly link comment to thread
+  postId: string; // Foreign key to the Post
   authorId: string;
   authorName: string;
   authorAvatar?: string;
-  authorRole: Role;
+  authorRole: Role; // Or string if role isn't strictly needed for comment display
   content: string;
   createdAt: Date;
 }
@@ -91,4 +92,16 @@ export interface DiscussionThread {
   lastActivityAt: Date;
   content: string; // Initial post content
   commentsCount: number; // To display comment count easily
+}
+
+// Original Comment type if used for DiscussionThread, ensure no name clash or merge logic
+export interface Comment { // This is for Discussion Threads
+  id: string;
+  threadId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  authorRole: Role;
+  content: string;
+  createdAt: Date;
 }

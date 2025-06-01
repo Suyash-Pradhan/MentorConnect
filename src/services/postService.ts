@@ -1,17 +1,10 @@
 
 'use server';
 /**
- * @fileOverview Service for managing posts in Firestore.
- *
- * - createPost - Creates a new post.
- * - getPostById - Fetches a single post by its ID.
- * - getAllPosts - Fetches all posts, optionally paginated or limited.
- * - getPostsByAuthor - Fetches posts by a specific author.
- * - updatePost - Updates an existing post.
- * - deletePost - Deletes a post.
+ * @fileOverview Service for managing posts and their comments/likes in Firestore.
  */
 import { db } from '@/lib/firebase';
-import type { Post } from '@/types';
+import type { Post, PostComment } from '@/types'; // Ensure PostComment is used for post comments
 import {
   doc,
   getDoc,
@@ -27,7 +20,10 @@ import {
   serverTimestamp,
   orderBy,
   limit as firestoreLimit,
-  type FieldValue
+  type FieldValue,
+  arrayUnion,
+  arrayRemove,
+  increment
 } from 'firebase/firestore';
 
 // Helper to convert Firestore Timestamps to Dates in a nested object
@@ -58,11 +54,12 @@ function convertDatesToTimestamps(data: any): any {
 }
 
 
-export async function createPost(postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'commentsCount'>): Promise<string> {
+export async function createPost(postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'commentsCount' | 'likedBy'>): Promise<string> {
   try {
     const dataToSet = {
       ...convertDatesToTimestamps(postData),
       likesCount: 0,
+      likedBy: [], // Initialize likedBy as an empty array
       commentsCount: 0,
       createdAt: serverTimestamp() as FieldValue,
       updatedAt: serverTimestamp() as FieldValue,
@@ -88,7 +85,7 @@ export async function getPostById(postId: string): Promise<Post | null> {
     if (postSnap.exists()) {
       const data = postSnap.data();
       const postWithDates = convertTimestampsToDates(data) as Omit<Post, 'id'>;
-      return { id: postSnap.id, ...postWithDates };
+      return { id: postSnap.id, ...postWithDates, likedBy: data.likedBy || [] }; // Ensure likedBy is always an array
     } else {
       return null;
     }
@@ -98,19 +95,28 @@ export async function getPostById(postId: string): Promise<Post | null> {
   }
 }
 
-export async function getAllPosts(options?: { limit?: number }): Promise<Post[]> {
+export async function getAllPosts(options?: { limit?: number; tag?: string }): Promise<Post[]> {
   try {
     const postsCollectionRef = collection(db, 'posts');
-    let q = query(postsCollectionRef, orderBy('createdAt', 'desc'));
+    let qConditions = [orderBy('createdAt', 'desc')];
 
+    if (options?.tag) {
+      qConditions.unshift(where('tags', 'array-contains', options.tag));
+      // IMPORTANT: This query (tags array-contains + orderBy createdAt)
+      // will require a composite index in Firestore.
+      // Firestore will provide an error message with a link to create it if missing.
+      // Example: Fields: 'tags' (Array), 'createdAt' (Descending)
+    }
     if (options?.limit) {
-      q = query(q, firestoreLimit(options.limit));
+      qConditions.push(firestoreLimit(options.limit));
     }
     
+    const q = query(postsCollectionRef, ...qConditions);
     const querySnapshot = await getDocs(q);
     const posts: Post[] = [];
-    querySnapshot.forEach((doc) => {
-      posts.push({ id: doc.id, ...convertTimestampsToDates(doc.data()) } as Post);
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      posts.push({ id: docSnap.id, ...convertTimestampsToDates(data), likedBy: data.likedBy || [] } as Post);
     });
     return posts;
   } catch (error) {
@@ -129,8 +135,9 @@ export async function getPostsByAuthor(authorId: string): Promise<Post[]> {
     const q = query(postsCollectionRef, where('authorId', '==', authorId), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
     const posts: Post[] = [];
-    querySnapshot.forEach((doc) => {
-      posts.push({ id: doc.id, ...convertTimestampsToDates(doc.data()) } as Post);
+    querySnapshot.forEach((docSnap) => {
+       const data = docSnap.data();
+      posts.push({ id: docSnap.id, ...convertTimestampsToDates(data), likedBy: data.likedBy || [] } as Post);
     });
     return posts;
   } catch (error) {
@@ -164,6 +171,7 @@ export async function deletePost(postId: string): Promise<void> {
     throw new Error("Post ID is required to delete post.");
   }
   try {
+    // TODO: Implement deletion of comments subcollection if posts are deleted (e.g., via a Cloud Function)
     const postDocRef = doc(db, 'posts', postId);
     await deleteDoc(postDocRef);
   } catch (error) {
@@ -172,3 +180,90 @@ export async function deletePost(postId: string): Promise<void> {
   }
 }
 
+// --- Like Functionality ---
+export async function toggleLikePost(postId: string, userId: string): Promise<void> {
+  if (!postId || !userId) {
+    throw new Error("Post ID and User ID are required to toggle like.");
+  }
+  const postDocRef = doc(db, 'posts', postId);
+  try {
+    const postSnap = await getDoc(postDocRef);
+    if (!postSnap.exists()) {
+      throw new Error("Post not found.");
+    }
+    const postData = postSnap.data();
+    const likedBy = postData.likedBy || [];
+
+    let updateData;
+    if (likedBy.includes(userId)) {
+      // User has liked, so unlike
+      updateData = {
+        likedBy: arrayRemove(userId),
+        likesCount: increment(-1)
+      };
+    } else {
+      // User has not liked, so like
+      updateData = {
+        likedBy: arrayUnion(userId),
+        likesCount: increment(1)
+      };
+    }
+    await updateDoc(postDocRef, updateData);
+  } catch (error) {
+    console.error("Error toggling like on post:", error);
+    throw error;
+  }
+}
+
+// --- Comment Functionality ---
+export async function addCommentToPost(
+  postId: string,
+  commentData: Omit<PostComment, 'id' | 'createdAt'>
+): Promise<string> {
+  if (!postId) {
+    throw new Error("Post ID is required to add a comment.");
+  }
+  if (commentData.postId !== postId) {
+      throw new Error("Comment data postId does not match postId parameter.");
+  }
+  const postDocRef = doc(db, 'posts', postId);
+  const commentsCollectionRef = collection(db, 'posts', postId, 'comments');
+
+  try {
+    const dataToSet = {
+      ...convertDatesToTimestamps(commentData),
+      createdAt: serverTimestamp() as FieldValue,
+    };
+    const commentDocRef = await addDoc(commentsCollectionRef, dataToSet);
+
+    // Atomically increment commentsCount on the post
+    await updateDoc(postDocRef, {
+      commentsCount: increment(1)
+    });
+
+    return commentDocRef.id;
+  } catch (error) {
+    console.error("Error adding comment to post:", error);
+    throw error;
+  }
+}
+
+export async function getCommentsForPost(postId: string): Promise<PostComment[]> {
+  if (!postId) {
+    console.error("getCommentsForPost: postId is required");
+    return [];
+  }
+  try {
+    const commentsCollectionRef = collection(db, 'posts', postId, 'comments');
+    const q = query(commentsCollectionRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const comments: PostComment[] = [];
+    querySnapshot.forEach((docSnap) => {
+      comments.push({ id: docSnap.id, ...convertTimestampsToDates(docSnap.data()) } as PostComment);
+    });
+    return comments;
+  } catch (error) {
+    console.error(`Error fetching comments for post ${postId}:`, error);
+    throw error;
+  }
+}

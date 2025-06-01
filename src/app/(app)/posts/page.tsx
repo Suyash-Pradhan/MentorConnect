@@ -2,60 +2,72 @@
 "use client";
 
 import React from 'react';
-import type { Post, Profile } from '@/types'; // Added Profile
+import type { Post, Profile } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import Image from 'next/image'; // Import next/image
+import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAllPosts } from '@/services/postService';
-import { getProfile } from '@/services/profileService'; // Added
+import { getProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
 
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; // Can be "student123" or "alumni456"
-
+const MOCK_CURRENT_USER_ID = "user123_dev"; 
 const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 
 export default function PostsPage() {
   const { toast } = useToast();
+  const router = useRouter(); // For clearing tag filter
+  const searchParams = useSearchParams(); // For reading tag from URL
+
   const [allPosts, setAllPosts] = React.useState<Post[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
   const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
+  const [activeTagFilter, setActiveTagFilter] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    const tagFromQuery = searchParams.get('tag');
+    setActiveTagFilter(tagFromQuery);
+
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
+        // Pass the tag from query to getAllPosts
         const [postsData, userProfile] = await Promise.all([
-          getAllPosts(),
-          getProfile(MOCK_CURRENT_USER_ID) // Fetch current user
+          getAllPosts({ tag: tagFromQuery || undefined }), 
+          getProfile(MOCK_CURRENT_USER_ID)
         ]);
         setAllPosts(postsData);
         setCurrentUser(userProfile);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to fetch initial data:", error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Could not load posts or user data. Please try again later.",
+          title: "Error Loading Posts",
+          description: error.message?.includes("index") 
+            ? "A Firestore index is required for this query. Please check the console for a link to create it, then refresh."
+            : "Could not load posts. Please try again later.",
         });
+         if (error.message?.includes("index")) {
+            console.error("Firestore index creation link (copy and paste into browser if not clickable):", error.message.substring(error.message.indexOf("https://")));
+        }
       } finally {
         setIsLoading(false);
       }
     };
     fetchInitialData();
-  }, [toast]);
+  }, [toast, searchParams]); // searchParams in dependency array to re-fetch on tag change
 
-  const filteredPosts = allPosts
+  const filteredPostsBySearchAndCategory = allPosts
     .filter(post => post.title.toLowerCase().includes(searchTerm.toLowerCase()) || post.content.toLowerCase().includes(searchTerm.toLowerCase()))
     .filter(post => categoryFilter && categoryFilter !== ALL_CATEGORIES_VALUE ? post.category === categoryFilter : true);
 
@@ -65,26 +77,7 @@ export default function PostsPage() {
 
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 px-4 md:px-6">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-                <Skeleton className="h-10 w-48 mb-2" />
-                <Skeleton className="h-5 w-72" />
-            </div>
-            <Skeleton className="h-10 w-36" /> {/* Placeholder for create button */}
-        </div>
-        <Card className="mb-6 p-4 shadow-sm bg-secondary">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-            </div>
-        </Card>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => <PostCardSkeleton key={i} />)}
-        </div>
-      </div>
-    );
+    return <PostsPageSkeleton />;
   }
 
   return (
@@ -102,6 +95,17 @@ export default function PostsPage() {
           </Button>
         )}
       </div>
+
+      {activeTagFilter && (
+        <div className="mb-6 p-4 rounded-md bg-accent/10 border border-accent flex items-center justify-between">
+          <p className="text-sm text-accent-foreground">
+            Showing posts tagged: <Badge variant="default" className="bg-accent text-accent-foreground">{activeTagFilter}</Badge>
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/posts')} className="text-accent hover:bg-accent/20">
+            <Icons.close className="mr-1 h-3 w-3" /> Clear Filter
+          </Button>
+        </div>
+      )}
 
       <Card className="mb-6 p-4 shadow-sm bg-secondary">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -138,9 +142,9 @@ export default function PostsPage() {
       </Card>
 
 
-      {filteredPosts.length > 0 ? (
+      {filteredPostsBySearchAndCategory.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPosts.map(post => (
+          {filteredPostsBySearchAndCategory.map(post => (
             <PostCard key={post.id} post={post} />
           ))}
         </div>
@@ -148,7 +152,11 @@ export default function PostsPage() {
         <div className="text-center py-12">
           <Icons.posts className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold">No Posts Found</h3>
-          <p className="text-muted-foreground">Try adjusting your search or check back later for new posts.</p>
+          <p className="text-muted-foreground">
+            {activeTagFilter 
+              ? `No posts found for the tag "${activeTagFilter}". Try clearing the filter or searching for something else.`
+              : "Try adjusting your search or check back later for new posts."}
+          </p>
         </div>
       )}
     </div>
@@ -156,6 +164,7 @@ export default function PostsPage() {
 }
 
 function PostCard({ post }: { post: Post }) {
+  // For PostCard in list view, like button is display-only. Interaction on single post page.
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
@@ -178,9 +187,11 @@ function PostCard({ post }: { post: Post }) {
       </CardHeader>
       
       {post.imageUrl && (
-        <div className="relative w-full h-48 overflow-hidden">
-          <Image src={post.imageUrl} alt={post.title} layout="fill" objectFit="cover" data-ai-hint="post image"/>
-        </div>
+        <Link href={`/posts/${post.id}`} passHref legacyBehavior>
+          <a className="block relative w-full h-48 overflow-hidden cursor-pointer">
+            <Image src={post.imageUrl} alt={post.title} layout="fill" objectFit="cover" data-ai-hint="post image"/>
+          </a>
+        </Link>
       )}
 
       <CardContent className="flex-grow pt-4">
@@ -204,11 +215,12 @@ function PostCard({ post }: { post: Post }) {
       <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
         <div className="flex justify-between w-full items-center">
             <div className="flex items-center gap-4 text-muted-foreground">
-                <Button variant="ghost" size="sm" className="p-1 h-auto hover:text-primary">
-                    <Icons.thumbsUp className="mr-1.5 h-4 w-4" /> {post.likesCount}
+                {/* Like button on card is display-only for count */}
+                <Button variant="ghost" size="sm" className="p-1 h-auto cursor-default hover:bg-transparent hover:text-muted-foreground">
+                    <Icons.thumbsUp className="mr-1.5 h-4 w-4" /> {post.likesCount || 0}
                 </Button>
-                <Button variant="ghost" size="sm" className="p-1 h-auto hover:text-primary">
-                    <Icons.discussions className="mr-1.5 h-4 w-4" /> {post.commentsCount}
+                <Button variant="ghost" size="sm" className="p-1 h-auto cursor-default hover:bg-transparent hover:text-muted-foreground">
+                    <Icons.discussions className="mr-1.5 h-4 w-4" /> {post.commentsCount || 0}
                 </Button>
             </div>
              <Button variant="link" asChild className="p-0 h-auto text-primary self-end">
@@ -217,13 +229,35 @@ function PostCard({ post }: { post: Post }) {
         </div>
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-2 w-full">
-            {post.tags.map(tag => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+            {post.tags.map(tag => (
+                <Link key={tag} href={`/posts?tag=${encodeURIComponent(tag)}`} passHref legacyBehavior>
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/20">{tag}</Badge>
+                </Link>
+            ))}
           </div>
         )}
       </CardFooter>
     </Card>
   );
 }
+
+const PostsPageSkeleton = () => (
+  <div className="container mx-auto py-8 px-4 md:px-6">
+    <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+      <div><Skeleton className="h-10 w-48 mb-2" /><Skeleton className="h-5 w-72" /></div>
+      <Skeleton className="h-10 w-36" />
+    </div>
+    <Card className="mb-6 p-4 shadow-sm bg-secondary">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </Card>
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => <PostCardSkeleton key={i} />)}
+    </div>
+  </div>
+);
 
 const PostCardSkeleton = () => (
   <Card className="flex flex-col h-full">

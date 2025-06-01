@@ -4,17 +4,17 @@
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Briefcase, MessageSquareHeart, UserPlus, Users, BookOpenText } from "lucide-react";
+import { ArrowRight, Briefcase, MessageSquareHeart, UserPlus, Users, BookOpenText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import type { Profile, Post, MentorshipRequest } from "@/types"; // Import Post and MentorshipRequest type
-import { getProfile } from "@/services/profileService";
-import { getAllPosts, getPostsByAuthor } from "@/services/postService"; // Import post services
-import { getMentorshipRequestsForUser } from "@/services/mentorshipService"; // Import mentorship service
+import type { Profile, Post, MentorshipRequest } from "@/types";
+import { getProfile, getProfilesByRole } from "@/services/profileService";
+import { getAllPosts, getPostsByAuthor } from "@/services/postService";
+import { getMentorshipRequestsForUser } from "@/services/mentorshipService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
 
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
 const MOCK_CURRENT_USER_ID = "user123_dev";
 
 export default function DashboardPage() {
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   
   // Student specific data
   const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = React.useState(false);
   const [recentPosts, setRecentPosts] = React.useState<Post[]>([]);
   const [isLoadingRecentPosts, setIsLoadingRecentPosts] = React.useState(false);
 
@@ -34,11 +35,10 @@ export default function DashboardPage() {
   const [activeMenteesCount, setActiveMenteesCount] = React.useState(0);
   const [isLoadingMentorshipStats, setIsLoadingMentorshipStats] = React.useState(false);
 
-
-  // Mock data for parts not yet connected to DB for student
+  // Mock data for parts not yet connected to DB for student (these specific stats aren't fully implemented beyond mentorship)
   const studentDashboardStats = {
-    pendingRequests: 2, 
-    upcomingMeetings: 1, 
+    pendingRequests: 0, // Will be derived from mentorships for student
+    upcomingMeetings: 0, // Mock, not implemented
   };
 
 
@@ -60,8 +60,9 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (currentUser?.role === 'student') {
-      const fetchRecentPosts = async () => {
+      const fetchStudentData = async () => {
         setIsLoadingRecentPosts(true);
+        setIsLoadingRecommendations(true);
         try {
           const posts = await getAllPosts({ limit: 3 }); 
           setRecentPosts(posts);
@@ -71,15 +72,67 @@ export default function DashboardPage() {
         } finally {
           setIsLoadingRecentPosts(false);
         }
+
+        // Fetch Smart Alumni Recommendations
+        if (currentUser.studentProfile) {
+          try {
+            const allAlumni = await getProfilesByRole('alumni');
+            if (allAlumni.length === 0) {
+              setRecommendedAlumni([]);
+              setIsLoadingRecommendations(false);
+              return;
+            }
+
+            const alumniProfilesString = allAlumni
+              .map(alumni => `Name: ${alumni.name || 'N/A'}, Industry: ${alumni.alumniProfile?.industry || 'N/A'}, Skills: ${(alumni.alumniProfile?.skills || []).join(', ') || 'N/A'}`)
+              .join('; ');
+
+            const aiInput: SmartAlumniRecommendationsInput = {
+              studentInterests: currentUser.studentProfile.academicInterests.join(', ') || 'General',
+              studentGoals: currentUser.studentProfile.goals || 'General career development',
+              studentAcademicInfo: `College: ${currentUser.studentProfile.college}, Year: ${currentUser.studentProfile.year}`,
+              alumniProfiles: alumniProfilesString,
+            };
+            
+            const recommendationsOutput = await getSmartAlumniRecommendations(aiInput);
+            const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
+            
+            const filteredRecommendedAlumni = allAlumni.filter(alumni => 
+              alumni.name && recommendedNames.includes(alumni.name.toLowerCase())
+            );
+            setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); // Show top 3
+
+          } catch (error) {
+            console.error("Failed to fetch smart alumni recommendations:", error);
+            toast({ variant: "destructive", title: "AI Error", description: "Could not load alumni recommendations." });
+          } finally {
+            setIsLoadingRecommendations(false);
+          }
+        } else {
+          setIsLoadingRecommendations(false); // No student profile to get recommendations
+        }
       };
-      fetchRecentPosts();
-      setRecommendedAlumni([]); // Placeholder for actual recommendations
+      fetchStudentData();
+
+      // Fetch student's mentorship request stats
+      const fetchStudentMentorshipStats = async () => {
+         try {
+           const requests = await getMentorshipRequestsForUser(currentUser.id, 'student');
+           studentDashboardStats.pendingRequests = requests.filter(req => req.status === 'pending').length;
+           // studentDashboardStats.upcomingMeetings could be based on accepted requests + a calendar feature (not implemented)
+         } catch (error) {
+            console.error("Failed to fetch student mentorship stats:", error);
+         }
+      };
+      fetchStudentMentorshipStats();
+
+
     } else if (currentUser?.role === 'alumni') {
-      const fetchMyPosts = async () => {
+      const fetchAlumniData = async () => {
         setIsLoadingMyPosts(true);
+        setIsLoadingMentorshipStats(true);
         try {
-          // For alumni, MOCK_CURRENT_USER_ID is used, in real app use currentUser.id
-          const posts = await getPostsByAuthor(MOCK_CURRENT_USER_ID); 
+          const posts = await getPostsByAuthor(currentUser.id); 
           setMyRecentPosts(posts.slice(0, 3)); 
         } catch (error) {
           console.error("Failed to fetch my posts:", error);
@@ -87,13 +140,9 @@ export default function DashboardPage() {
         } finally {
           setIsLoadingMyPosts(false);
         }
-      };
 
-      const fetchAlumniMentorshipStats = async () => {
-        setIsLoadingMentorshipStats(true);
         try {
-          // For alumni, MOCK_CURRENT_USER_ID is used, in real app use currentUser.id
-          const requests = await getMentorshipRequestsForUser(MOCK_CURRENT_USER_ID, 'alumni');
+          const requests = await getMentorshipRequestsForUser(currentUser.id, 'alumni');
           const pendingCount = requests.filter(req => req.status === 'pending').length;
           const acceptedCount = requests.filter(req => req.status === 'accepted').length;
           setNewMentorshipRequestsCount(pendingCount);
@@ -105,9 +154,7 @@ export default function DashboardPage() {
           setIsLoadingMentorshipStats(false);
         }
       };
-
-      fetchMyPosts();
-      fetchAlumniMentorshipStats();
+      fetchAlumniData();
     }
   }, [currentUser, toast]);
 
@@ -175,22 +222,22 @@ export default function DashboardPage() {
       {userRole === 'student' && (
         <Card className="shadow-md">
           <CardHeader><CardTitle className="text-2xl">Student Dashboard</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <p className="text-muted-foreground">You have <span className="font-semibold text-primary">{studentDashboardStats.pendingRequests} pending mentorship requests</span> and <span className="font-semibold text-primary">{studentDashboardStats.upcomingMeetings} upcoming meetings</span>.</p>
             
             <div>
-              <h3 className="text-lg font-semibold mb-2">Recommended Alumni</h3>
-              {recommendedAlumni.length > 0 ? (
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Sparkles className="text-accent h-5 w-5"/> Recommended Alumni for You</h3>
+              {isLoadingRecommendations ? <RecommendedAlumniSkeleton /> : recommendedAlumni.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {recommendedAlumni.map(alumni => (
-                    <Card key={alumni.id} className="p-4 flex items-center gap-3 shadow-sm">
+                    <Card key={alumni.id} className="p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
                       <Image src={alumni.avatarUrl || `https://placehold.co/40x40.png?text=${alumni.name?.charAt(0)}`} alt={alumni.name || 'Alumni'} width={40} height={40} className="rounded-full" data-ai-hint="person professional" />
                       <div>
                         <p className="font-semibold">{alumni.name}</p>
                         <p className="text-sm text-muted-foreground">{alumni.alumniProfile?.industry}</p>
                       </div>
                       <Button variant="outline" size="sm" className="ml-auto" asChild>
-                          <Link href={`/alumni-directory/${alumni.id}`}>View</Link>
+                          <Link href={`/alumni-directory`}>View</Link> 
                       </Button>
                     </Card>
                   ))}
@@ -204,7 +251,7 @@ export default function DashboardPage() {
               {isLoadingRecentPosts ? <PostListSkeleton /> : recentPosts.length > 0 ? (
                 <ul className="space-y-2">
                   {recentPosts.map(post => (
-                    <li key={post.id} className="p-3 bg-secondary rounded-md shadow-sm">
+                    <li key={post.id} className="p-3 bg-secondary rounded-md shadow-sm hover:bg-secondary/80 transition-colors">
                       <Link href={`/posts/${post.id}`} className="font-medium text-primary hover:underline">{post.title}</Link>
                       <p className="text-sm text-muted-foreground">by {post.authorName}</p>
                     </li>
@@ -234,7 +281,7 @@ export default function DashboardPage() {
                {isLoadingMyPosts ? <PostListSkeleton /> : myRecentPosts.length > 0 ? (
                  <ul className="space-y-2">
                   {myRecentPosts.map(post => (
-                    <li key={post.id} className="p-3 bg-secondary rounded-md shadow-sm">
+                    <li key={post.id} className="p-3 bg-secondary rounded-md shadow-sm hover:bg-secondary/80 transition-colors">
                       <Link href={`/posts/${post.id}`} className="font-medium text-primary hover:underline">{post.title}</Link>
                     </li>
                   ))}
@@ -263,19 +310,37 @@ const DashboardSkeleton = () => (
     </div>
     <Card>
         <CardHeader><Skeleton className="h-7 w-1/3" /></CardHeader>
-        <CardContent className="space-y-4">
-            <Skeleton className="h-5 w-full" /> 
+        <CardContent className="space-y-6">
+            <Skeleton className="h-5 w-full mb-4" /> 
             <div>
-                <Skeleton className="h-5 w-1/4 mb-2" />
-                <div className="space-y-2">
-                    {Array.from({length:2}).map((_,j)=><Skeleton key={j} className="h-10 w-full"/>)}
-                </div>
+                <Skeleton className="h-6 w-1/4 mb-3" />
+                <RecommendedAlumniSkeleton />
+            </div>
+            <div>
+                <Skeleton className="h-6 w-1/3 mb-3" />
+                <PostListSkeleton />
             </div>
              <Skeleton className="h-10 w-40 mt-2" />
         </CardContent>
     </Card>
   </div>
 );
+
+const RecommendedAlumniSkeleton = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.from({length:2}).map((_,j)=>(
+            <Card key={j} className="p-4 flex items-center gap-3 shadow-sm">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                </div>
+                <Skeleton className="h-8 w-16" />
+            </Card>
+        ))}
+    </div>
+);
+
 
 const PostListSkeleton = () => (
   <ul className="space-y-2">
@@ -288,5 +353,4 @@ const PostListSkeleton = () => (
   </ul>
 );
 
-
-      
+    

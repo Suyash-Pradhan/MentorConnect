@@ -13,9 +13,9 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
-      <div className="flex h-16 items-center w-full"> {/* Added w-full here */}
+      <div className="flex h-16 items-center w-full"> {/* Ensured w-full here */}
         {/* Sidebar Toggle Section - Fixed width to match collapsed sidebar and vertically center button */}
-        <div className="flex h-full w-12 items-center justify-center"> {/* w-12 is 3rem (var(--sidebar-width-icon)) */}
+        <div className="flex h-full w-12 items-center justify-center"> 
           <Button
             variant="ghost"
             size="icon" 
@@ -48,3 +48,5 @@ export function AppHeader() {
     </header>
   );
 }
+
+    

@@ -51,7 +51,7 @@ export default function MentorshipPage() {
     };
 
     fetchMentorshipData();
-  }, [userProfile, profileLoading, toast]); // Depend on userProfile and profileLoading from context
+  }, [userProfile, profileLoading]); // Depend on userProfile and profileLoading from context, removed toast
 
   const handleUpdateRequestStatus = async (requestId: string, newStatus: 'accepted' | 'rejected' | 'messaged', message?: string) => {
     try {
@@ -228,3 +228,4 @@ const RequestCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
+

@@ -1,3 +1,4 @@
+
 export type NavItem = {
   title: string;
   href: string;
@@ -96,7 +97,7 @@ export const siteConfig: SiteConfig = {
       roles: ['student', 'alumni'],
     },
      {
-      title: 'Help &amp; Support',
+      title: 'Help &amp; Support', // Ensured correct spelling
       href: '/help',
       icon: LifeBuoy,
       roles: ['student', 'alumni'],

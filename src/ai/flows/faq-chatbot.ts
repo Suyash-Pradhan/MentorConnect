@@ -113,6 +113,8 @@ Remember, your primary function is to assist with platform-related queries. Poli
 If a tool returns empty data (e.g., no industries found), inform the user gracefully (e.g., "Currently, no specific industries are listed, but you can browse all alumni in the directory.").
 Do not invent information if the tools don't provide it. Instead, guide the user to where they might find it on the platform or suggest rephrasing.
 
+**Important Output Requirement:** Your entire response MUST be a single, valid JSON object that strictly adheres to the output schema. Do not include any text, markdown, or explanations outside of this JSON object. The JSON object should directly contain the 'answer' field as a string.
+
 User's question: {{{question}}}`,
 });
 
@@ -145,3 +147,4 @@ const answerFAQFlow = ai.defineFlow(
     }
   }
 );
+

@@ -51,7 +51,15 @@ export default function DashboardPage() {
         router.push('/profile?edit=true&from=dashboard_name_missing');
       }
     } else if (!profileError) { 
-      router.push('/role-selection');
+      // If no profile and no error, user might be new or auth state changed.
+      // Let onAuthStateChanged in AppLayout handle redirect to login if firebaseUser becomes null.
+      // If firebaseUser exists but profile is null (and no error), role-selection is appropriate.
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser) {
+          router.push('/role-selection');
+      } else {
+          router.push('/login'); // Should be caught by AppLayout, but as a fallback.
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile, profileLoading, profileError, router]);
@@ -101,7 +109,7 @@ export default function DashboardPage() {
                 toast({ variant: "destructive", title: "AI Error", description: recommendationsOutput.recommendedAlumni });
                 setRecommendedAlumni([]);
             } else if (recommendationsOutput.recommendedAlumni === "") {
-                 setRecommendedAlumni([]); // No recommendations returned by AI
+                 setRecommendedAlumni([]); 
             } else {
                 const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
                 const filteredRecommendedAlumni = alumniForAI.filter(alumni => 
@@ -111,18 +119,22 @@ export default function DashboardPage() {
             }
 
           } catch (error: any) {
-            console.error("Failed to fetch smart alumni recommendations:", error);
+            console.error("[DashboardPage] Failed to fetch smart alumni recommendations. Raw Error:", error);
             let description = "Could not load alumni recommendations due to an unexpected issue.";
             if (error.message) {
-                 if (error.message.toLowerCase().includes('api key') || error.message.toLowerCase().includes('auth')) {
-                    description = "AI recommendations failed. There might be an issue with the AI service configuration (e.g., API key). Please check server logs.";
+                if (error.message.toLowerCase().includes('permission') || error.message.toLowerCase().includes('denied')) {
+                description = "AI recommendations failed: Permission denied when accessing data. This is likely a Firestore Security Rules issue for server-side operations. Please check server logs.";
+                } else if (error.message.toLowerCase().includes('api key') || error.message.toLowerCase().includes('auth')) {
+                description = "AI recommendations failed. There might be an issue with the AI service configuration (e.g., API key). Please check server logs.";
                 } else if (error.message.toLowerCase().includes('quota')) {
-                    description = "AI recommendations failed due to API quota limits.";
+                description = "AI recommendations failed due to API quota limits.";
+                } else if (error.message.toLowerCase().includes('genkit') || error.message.toLowerCase().includes('flow')) {
+                description = `An error occurred within the AI recommendation flow: ${error.message.substring(0,100)}${error.message.length > 100 ? '...' : ''}. Check server logs.`;
                 } else {
-                    description = `AI recommendations failed: ${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''}`;
+                description = `AI recommendations failed: ${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''}`;
                 }
             }
-            toast({ variant: "destructive", title: "AI Recommendation Error", description });
+            toast({ variant: "destructive", title: "AI Recommendation Error", description, duration: 10000 });
             setRecommendedAlumni([]);
           } finally {
             setIsLoadingRecommendations(false);
@@ -173,7 +185,7 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [userProfile, profileLoading]); 
+  }, [userProfile, profileLoading, toast]); // Removed toast from here as it was causing re-runs; toast is stable.
 
   if (profileLoading) { 
     return <DashboardSkeleton />;
@@ -199,9 +211,12 @@ export default function DashboardPage() {
             <Icons.warning className="h-16 w-16 text-destructive mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Profile Not Loaded</h2>
             <p className="text-muted-foreground text-center mb-4">
-                Your profile could not be loaded. You might need to complete your registration.
+                Your profile could not be loaded. You might need to complete your registration or log in again.
             </p>
-            <Button onClick={() => router.push('/role-selection')}>Setup Profile</Button>
+            <div className="flex gap-2">
+                <Button onClick={() => router.push('/role-selection')}>Setup Profile</Button>
+                <Button variant="outline" onClick={() => router.push('/login')}>Login</Button>
+            </div>
         </div>
     );
   }

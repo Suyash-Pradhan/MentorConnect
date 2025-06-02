@@ -36,10 +36,11 @@ const nextConfig: NextConfig = {
       config.resolve = config.resolve || {};
       config.resolve.fallback = config.resolve.fallback || {};
 
-      // Standard fallbacks (should handle these)
+      // Standard fallbacks
       config.resolve.fallback.async_hooks = false;
       config.resolve.fallback['node:async_hooks'] = false;
-      config.resolve.fallback.fs = false;
+      config.resolve.fallback.fs = false; // Added for fs
+      config.resolve.fallback['node:fs'] = false; // Added for node:fs
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
       config.resolve.fallback.http2 = false;
@@ -51,7 +52,7 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:buffer'] = false;
 
 
-      // Add IgnorePlugin for node: prefixed modules and non-prefixed ones as a stronger measure
+      // Add IgnorePlugin for node: prefixed modules and non-prefixed ones
       if (webpack && webpack.IgnorePlugin) { // Check if webpack and IgnorePlugin are available
         config.plugins = config.plugins || []; // Ensure plugins array exists
         config.plugins.push(
@@ -61,7 +62,7 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
-            resourceRegExp: /^async_hooks$/, // For non-prefixed
+            resourceRegExp: /^async_hooks$/,
           })
         );
         config.plugins.push(
@@ -71,7 +72,7 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
-            resourceRegExp: /^perf_hooks$/, // For non-prefixed
+            resourceRegExp: /^perf_hooks$/,
           })
         );
         config.plugins.push(
@@ -81,7 +82,17 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
-            resourceRegExp: /^buffer$/, // For non-prefixed
+            resourceRegExp: /^buffer$/,
+          })
+        );
+        config.plugins.push( // Added for fs
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:fs$/,
+          })
+        );
+        config.plugins.push( // Added for fs
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^fs$/,
           })
         );
       }

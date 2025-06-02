@@ -10,7 +10,7 @@
  */
 import { db } from '@/lib/firebase';
 import type { Profile, StudentProfile, AlumniProfile, Role } from '@/types';
-import { doc, getDoc, setDoc, Timestamp, serverTimestamp, type FieldValue, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp, serverTimestamp, type FieldValue, collection, query, where, getDocs, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 
 // Helper to convert Firestore Timestamps to Dates in a nested object
 function convertTimestampsToDates(data: any): any {
@@ -121,14 +121,19 @@ export async function initializeRoleProfile(role: 'student' | 'alumni'): Promise
   }
 }
 
-export async function getProfilesByRole(role: Role): Promise<Profile[]> {
+export async function getProfilesByRole(role: Role, options?: { limit?: number }): Promise<Profile[]> {
   if (!role) {
     console.error("getProfilesByRole: role is required");
     return [];
   }
   try {
     const usersCollectionRef = collection(db, 'users');
-    const q = query(usersCollectionRef, where('role', '==', role));
+    let q = query(usersCollectionRef, where('role', '==', role), orderBy('createdAt', 'desc')); // Assuming you want to order by creation date for relevance
+
+    if (options?.limit) {
+      q = query(q, firestoreLimit(options.limit));
+    }
+
     const querySnapshot = await getDocs(q);
     const profiles: Profile[] = [];
     querySnapshot.forEach((doc) => {

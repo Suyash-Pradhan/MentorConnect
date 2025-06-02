@@ -14,13 +14,18 @@ import { getMentorshipRequestsForUser } from "@/services/mentorshipService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
-const MOCK_CURRENT_USER_ID = "user123_dev";
 
 export default function DashboardPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = React.useState(true);
+  const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = React.useState(true);
   
   // Student specific data
   const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
@@ -41,25 +46,51 @@ export default function DashboardPage() {
     upcomingMeetings: 0, // Mock, not implemented
   };
 
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setAuthLoading(false);
+      if (!user) {
+        router.push('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   React.useEffect(() => {
+    if (authLoading || !firebaseUser) return;
+
     const fetchProfile = async () => {
       setIsLoadingProfile(true);
       try {
-        const profile = await getProfile(MOCK_CURRENT_USER_ID);
-        setCurrentUser(profile);
+        const profile = await getProfile(firebaseUser.uid);
+        if (profile) {
+          setCurrentUser(profile);
+          if (!profile.role) {
+            router.push('/role-selection');
+          } else if (!profile.name) {
+            router.push('/profile?edit=true&from=dashboard');
+          }
+        } else {
+          // Should be handled by signup creating a profile, but as a fallback:
+          router.push('/role-selection');
+        }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load your profile." });
+        // Potentially redirect to login if profile load fails catastrophically
+        router.push('/login');
       } finally {
         setIsLoadingProfile(false);
       }
     };
     fetchProfile();
-  }, [toast]);
+  }, [firebaseUser, authLoading, toast, router]);
 
   React.useEffect(() => {
-    if (currentUser?.role === 'student') {
+    if (!currentUser) return;
+
+    if (currentUser.role === 'student') {
       const fetchStudentData = async () => {
         setIsLoadingRecentPosts(true);
         setIsLoadingRecommendations(true);
@@ -76,14 +107,15 @@ export default function DashboardPage() {
         // Fetch Smart Alumni Recommendations
         if (currentUser.studentProfile) {
           try {
-            const allAlumni = await getProfilesByRole('alumni');
-            if (allAlumni.length === 0) {
+            // Fetch a limited set of alumni for AI processing to improve performance
+            const alumniForAI = await getProfilesByRole('alumni', { limit: 50 }); 
+            if (alumniForAI.length === 0) {
               setRecommendedAlumni([]);
               setIsLoadingRecommendations(false);
               return;
             }
 
-            const alumniProfilesString = allAlumni
+            const alumniProfilesString = alumniForAI
               .map(alumni => `Name: ${alumni.name || 'N/A'}, Industry: ${alumni.alumniProfile?.industry || 'N/A'}, Skills: ${(alumni.alumniProfile?.skills || []).join(', ') || 'N/A'}`)
               .join('; ');
 
@@ -97,7 +129,9 @@ export default function DashboardPage() {
             const recommendationsOutput = await getSmartAlumniRecommendations(aiInput);
             const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
             
-            const filteredRecommendedAlumni = allAlumni.filter(alumni => 
+            // Filter the *limited* set of alumni we passed to AI, or fetch specific ones if names are reliable
+            // For simplicity, filtering the already fetched limited set.
+            const filteredRecommendedAlumni = alumniForAI.filter(alumni => 
               alumni.name && recommendedNames.includes(alumni.name.toLowerCase())
             );
             setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); // Show top 3
@@ -127,7 +161,7 @@ export default function DashboardPage() {
       fetchStudentMentorshipStats();
 
 
-    } else if (currentUser?.role === 'alumni') {
+    } else if (currentUser.role === 'alumni') {
       const fetchAlumniData = async () => {
         setIsLoadingMyPosts(true);
         setIsLoadingMentorshipStats(true);
@@ -156,18 +190,10 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [currentUser, toast]);
+  }, [currentUser, toast]); // Removed MOCK_CURRENT_USER_ID from dependencies
 
-  if (isLoadingProfile) {
+  if (authLoading || isLoadingProfile || !currentUser) { // Added !currentUser check
     return <DashboardSkeleton />;
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="text-center py-10">
-        <p>Could not load user profile. Please try refreshing or logging in again.</p>
-      </div>
-    );
   }
 
   const userName = currentUser.name || "User";
@@ -231,7 +257,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {recommendedAlumni.map(alumni => (
                     <Card key={alumni.id} className="p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
-                      <Image src={alumni.avatarUrl || `https://placehold.co/40x40.png?text=${alumni.name?.charAt(0)}`} alt={alumni.name || 'Alumni'} width={40} height={40} className="rounded-full" data-ai-hint="person professional" />
+                      <Image src={alumni.avatarUrl || `https://placehold.co/40x40.png?text=${alumni.name?.charAt(0)}`} alt={alumni.name || 'Alumni'} width={40} height={40} className="rounded-full" data-ai-hint="person professional"/>
                       <div>
                         <p className="font-semibold">{alumni.name}</p>
                         <p className="text-sm text-muted-foreground">{alumni.alumniProfile?.industry}</p>

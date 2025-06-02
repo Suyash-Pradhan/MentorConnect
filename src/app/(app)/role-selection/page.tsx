@@ -9,18 +9,16 @@ import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import type { Role, Profile, StudentProfile, AlumniProfile } from "@/types";
 import { getProfile, setProfile, initializeRoleProfile } from "@/services/profileService";
-import { auth } from "@/lib/firebase"; // Import Firebase auth instance
-// Removed: onAuthStateChanged, type User as FirebaseUser - AppLayout handles auth state
+import { auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUserProfile } from "@/contexts/user-profile-context"; // Import context hook
 
 export default function RoleSelectionPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { refetchUserProfile } = useUserProfile(); // Get refetch function from context
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedRoleForUI, setSelectedRoleForUI] = React.useState<Role | null>(null);
-
-  // AppLayout ensures that this page is only rendered for authenticated users.
-  // We can directly use auth.currentUser.
 
   const handleRoleSelection = async (role: 'student' | 'alumni') => {
     if (isLoading) return;
@@ -28,8 +26,7 @@ export default function RoleSelectionPage() {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
       toast({ variant: "destructive", title: "Authentication Error", description: "No authenticated user found. Please try logging in again." });
-      // AppLayout should handle redirecting to login if auth state is lost.
-      router.push("/login"); // Fallback redirect
+      router.push("/login");
       return;
     }
 
@@ -40,10 +37,10 @@ export default function RoleSelectionPage() {
       const userId = firebaseUser.uid;
       const userEmail = firebaseUser.email || "unknown@example.com";
 
-      let userProfile = await getProfile(userId);
+      let userProfileData = await getProfile(userId);
 
-      if (!userProfile) {
-        userProfile = {
+      if (!userProfileData) {
+        userProfileData = {
           id: userId,
           email: userEmail,
           role: role,
@@ -52,24 +49,25 @@ export default function RoleSelectionPage() {
           avatarUrl: firebaseUser.photoURL || "",
         };
       } else {
-        userProfile.role = role;
+        userProfileData.role = role;
       }
 
       if (role === 'student') {
-        userProfile.studentProfile = userProfile.studentProfile || await initializeRoleProfile('student') as StudentProfile;
-        userProfile.alumniProfile = undefined;
+        userProfileData.studentProfile = userProfileData.studentProfile || await initializeRoleProfile('student') as StudentProfile;
+        userProfileData.alumniProfile = undefined;
       } else {
-        userProfile.alumniProfile = userProfile.alumniProfile || await initializeRoleProfile('alumni') as AlumniProfile;
-        userProfile.studentProfile = undefined;
+        userProfileData.alumniProfile = userProfileData.alumniProfile || await initializeRoleProfile('alumni') as AlumniProfile;
+        userProfileData.studentProfile = undefined;
       }
       
-      await setProfile(userId, userProfile);
+      await setProfile(userId, userProfileData);
+      await refetchUserProfile(); // Update the context immediately
 
       toast({
         title: "Role Selected!",
         description: `You are now registered as a ${role}. Redirecting to complete your profile...`,
       });
-      router.push("/profile?edit=true&from=role_selection"); // Redirect to profile page to complete info
+      router.push("/profile?edit=true&from=role_selection");
 
     } catch (error) {
       console.error("Error saving role:", error);
@@ -84,8 +82,6 @@ export default function RoleSelectionPage() {
     }
   };
 
-  // Show loading skeleton or a message if auth.currentUser is somehow not available yet,
-  // though AppLayout should prevent this page from rendering in such a state.
   if (!auth.currentUser && !isLoading) {
     return (
          <div className="flex items-center justify-center w-full py-12">
@@ -103,7 +99,6 @@ export default function RoleSelectionPage() {
         </div>
     );
   }
-
 
   return (
     <div className="flex items-center justify-center w-full py-12"> 

@@ -11,22 +11,20 @@ import type { Profile, Post, MentorshipRequest } from "@/types";
 // getProfile removed, auth removed
 import { getAllPosts, getPostsByAuthor } from "@/services/postService";
 import { getMentorshipRequestsForUser } from "@/services/mentorshipService"; 
-import { getProfilesByRole } from "@/services/profileService"; // Corrected import for getProfilesByRole
+import { getProfilesByRole } from "@/services/profileService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
 import { useRouter } from "next/navigation";
-import { useUserProfile } from "@/contexts/user-profile-context"; // Import context hook
-import { Icons } from "@/components/icons"; // For warning icon
+import { useUserProfile } from "@/contexts/user-profile-context"; 
+import { Icons } from "@/components/icons"; 
+import { auth } from "@/lib/firebase";
 
-// If getProfilesByRole is primarily for alumni directory/AI rec, maybe it should be in profileService
-// For now, assuming it might be used by mentorshipService as well or is a general profile utility.
-// If it's purely a profile service, import { getProfilesByRole } from "@/services/profileService";
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { userProfile, profileLoading, profileError, refetchUserProfile } = useUserProfile(); // Use context
+  const { userProfile, profileLoading, profileError, refetchUserProfile } = useUserProfile(); 
 
   const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
   const [isLoadingRecommendations, setIsLoadingRecommendations] = React.useState(false);
@@ -45,21 +43,22 @@ export default function DashboardPage() {
   };
 
   React.useEffect(() => {
-    // Profile data and loading/error state comes from context.
-    // Redirect if profile is incomplete.
-    if (!profileLoading && userProfile) {
-      if (!userProfile.role) {
+    if (profileLoading) return; // Wait for context to finish loading profile
+
+    if (userProfile) { // Profile exists
+      if (!userProfile.role) { // Role is missing
         router.push('/role-selection');
-      } else if (!userProfile.name || userProfile.name.trim() === "") {
+      } else if (!userProfile.name || userProfile.name.trim() === "") { // Name is missing (role exists)
         router.push('/profile?edit=true&from=dashboard_name_missing');
       }
-    } else if (!profileLoading && !userProfile && !profileError) {
-      // This case means profile doesn't exist for an authenticated user.
-      // AppLayout should handle initial auth, this page handles Firestore profile existence.
-      toast({ variant: "destructive", title: "Profile Incomplete", description: "Your profile is not fully set up." });
+    } else if (!profileError) { // Profile does not exist (and not due to error)
+      // This implies a new Firebase user whose Firestore profile doc hasn't been created yet.
+      // AppLayout has confirmed Firebase auth, but Firestore profile is missing.
+      // Redirect to role selection for new profile creation flow.
       router.push('/role-selection');
     }
-  }, [userProfile, profileLoading, profileError, router, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile, profileLoading, profileError, router]);
 
 
   React.useEffect(() => {
@@ -82,7 +81,6 @@ export default function DashboardPage() {
 
         if (userProfile.studentProfile) {
           try {
-            // Using getProfilesByRole from profileService is more appropriate
             const alumniForAI = await getProfilesByRole('alumni', { limit: 50 }); 
              if (alumniForAI.length === 0) {
               setRecommendedAlumni([]);
@@ -161,26 +159,27 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [userProfile, profileLoading, toast]); // Depend on userProfile from context
+  }, [userProfile, profileLoading, toast]); 
 
   if (profileLoading) { 
     return <DashboardSkeleton />;
   }
 
-  if (profileError) { // Error handled by AppLayout's context provider, but can show specific message here
+  if (profileError) { 
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
             <Icons.warning className="h-16 w-16 text-destructive mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Error Loading Dashboard</h2>
             <p className="text-muted-foreground text-center mb-4">
                 We couldn&apos;t load your dashboard due to a profile error. AppLayout might show more details.
+                 {profileError.message && <span className="block text-xs mt-1">Details: {profileError.message}</span>}
             </p>
              <Button onClick={() => router.push('/login')}>Return to Login</Button>
         </div>
     );
   }
   
-  if (!userProfile) { // Should be covered by redirection logic, but as a fallback
+  if (!userProfile) { 
      return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
             <Icons.warning className="h-16 w-16 text-destructive mb-4" />
@@ -196,6 +195,23 @@ export default function DashboardPage() {
 
   const userName = userProfile.name || "User";
   const userRole = userProfile.role;
+
+  // If role is still null/undefined here, something is wrong with the flow before Dashboard
+  // For example, role selection didn't save or context didn't update.
+  // The useEffect above should have redirected. This is a fallback display.
+  if (!userRole) {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+            <Icons.warning className="h-16 w-16 text-amber-500 mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Role Not Set</h2>
+            <p className="text-muted-foreground text-center mb-4">
+                Your role is not yet set in your profile. Please complete role selection.
+            </p>
+            <Button onClick={() => router.push('/role-selection')}>Select Role</Button>
+        </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6 w-full">
@@ -376,4 +392,3 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
-

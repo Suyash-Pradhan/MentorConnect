@@ -36,11 +36,11 @@ const nextConfig: NextConfig = {
       config.resolve = config.resolve || {};
       config.resolve.fallback = config.resolve.fallback || {};
 
-      // Standard fallbacks
+      // Standard fallbacks for both prefixed and non-prefixed
       config.resolve.fallback.async_hooks = false;
       config.resolve.fallback['node:async_hooks'] = false;
-      config.resolve.fallback.fs = false; 
-      config.resolve.fallback['node:fs'] = false; 
+      config.resolve.fallback.fs = false;
+      config.resolve.fallback['node:fs'] = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
       config.resolve.fallback.http2 = false;
@@ -50,11 +50,11 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:perf_hooks'] = false;
       config.resolve.fallback.buffer = false;
       config.resolve.fallback['node:buffer'] = false;
-      config.resolve.fallback.https = false; // Added for https
-      config.resolve.fallback['node:https'] = false; // Added for node:https
+      config.resolve.fallback.https = false;
+      config.resolve.fallback['node:https'] = false;
 
 
-      // Add IgnorePlugin for node: prefixed modules and non-prefixed ones
+      // Add IgnorePlugin for node: prefixed modules ONLY
       if (webpack && webpack.IgnorePlugin) { // Check if webpack and IgnorePlugin are available
         config.plugins = config.plugins || []; // Ensure plugins array exists
         config.plugins.push(
@@ -64,17 +64,7 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
-            resourceRegExp: /^async_hooks$/,
-          })
-        );
-        config.plugins.push(
-          new webpack.IgnorePlugin({
             resourceRegExp: /^node:perf_hooks$/,
-          })
-        );
-        config.plugins.push(
-          new webpack.IgnorePlugin({
-            resourceRegExp: /^perf_hooks$/,
           })
         );
         config.plugins.push(
@@ -84,27 +74,12 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
-            resourceRegExp: /^buffer$/,
-          })
-        );
-        config.plugins.push( 
-          new webpack.IgnorePlugin({
             resourceRegExp: /^node:fs$/,
           })
         );
-        config.plugins.push( 
-          new webpack.IgnorePlugin({
-            resourceRegExp: /^fs$/,
-          })
-        );
-        config.plugins.push( // Added for https
+        config.plugins.push(
           new webpack.IgnorePlugin({
             resourceRegExp: /^node:https$/,
-          })
-        );
-        config.plugins.push( // Added for https
-          new webpack.IgnorePlugin({
-            resourceRegExp: /^https$/,
           })
         );
       }

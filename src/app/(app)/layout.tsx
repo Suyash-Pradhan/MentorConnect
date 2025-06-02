@@ -1,33 +1,93 @@
 
-"use server";
+"use client"; // Make it a client component
 
 import type { ReactNode } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { Icons } from '@/components/icons';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // For potential error button
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
 import type { Profile } from '@/types';
 import { getProfile } from '@/services/profileService';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
-const MOCK_CURRENT_USER_ID = "user123_dev";
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true); // Start true for initial load
+  const [profileError, setProfileError] = useState<any>(null);
 
-export default async function AppLayout({ children }: { children: ReactNode }) {
-  let userProfile: Profile | null = null;
-  let profileError: Error | null = null;
-  const currentPath = ''; // This would ideally be obtained dynamically if needed for server-side redirects
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        setProfileLoading(true);
+        setProfileError(null); // Reset error on new auth state
+        try {
+          const profile = await getProfile(user.uid);
+          setUserProfile(profile);
 
-  try {
-    userProfile = await getProfile(MOCK_CURRENT_USER_ID);
-  } catch (error: any) {
-    console.error("[AppLayout] Error fetching profile:", error);
-    profileError = error;
+          // Handle initial redirection logic if necessary, though primary redirection should be handled by login/signup/role-selection pages
+          if (profile && !profile.role && pathname !== '/role-selection') {
+            // router.push('/role-selection'); // Might cause loops if not careful
+          } else if (profile && profile.role && !profile.name && pathname !== '/profile' && !pathname.startsWith('/profile?edit=true')) {
+             // router.push('/profile?edit=true&from=layout_name_missing');
+          }
+
+        } catch (e) {
+          console.error("[AppLayout] Error fetching profile in onAuthStateChanged:", e);
+          setProfileError(e);
+          setUserProfile(null);
+        } finally {
+          setProfileLoading(false);
+        }
+      } else {
+        setUserProfile(null);
+        setProfileLoading(false);
+        // If not on an auth page or homepage, redirect to login
+        if (!['/login', '/signup', '/'].includes(pathname)) {
+           // router.push('/login'); // Can be aggressive, consider user experience
+        }
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, [router, pathname]);
+
+
+  if (authLoading || (firebaseUser && profileLoading && !userProfile && !profileError) ) {
+    // Show a basic loading skeleton for the whole layout
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen flex-col w-full">
+          <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm h-16 flex items-center">
+             <Skeleton className="h-8 w-8 ml-4" />
+             <Skeleton className="h-6 w-24 ml-4" />
+             <div className="flex-grow" />
+             <Skeleton className="h-9 w-9 mr-4 rounded-full" />
+          </header>
+          <div className="flex flex-1 w-full">
+            <aside className="hidden md:block w-16 lg:w-64 border-r p-4 space-y-4">
+                {Array.from({length: 5}).map((_,i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </aside>
+            <main className="flex-grow p-6"><Skeleton className="h-64 w-full" /></main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
   }
 
-  if (profileError) {
+  // Error display for Firestore issues, adapted from original server component logic
+  if (profileError && firebaseUser) { // Only show this error if a user is logged in but profile fetch failed
     const firebaseError = profileError as any;
     let errorTitle = "Application Error";
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
@@ -45,7 +105,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <li key="step2"><strong>Enable Firestore API:</strong> Go to <a href={firestoreApiLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Cloud Firestore API Page</a>. If it's not enabled, click "Enable".</li>,
         <li key="step3"><strong>Create Firestore Database:</strong> In the <a href={firebaseConsoleLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Firebase Console for <code>{displayProjectId}</code></a>, go to "Firestore Database" (under Build). If no database exists, click "Create database" (choose a region and start in test mode for development).</li>,
         <li key="step4"><strong>Wait for Propagation:</strong> After enabling the API or creating the database, wait 10-20 minutes for changes to propagate.</li>,
-        <li key="step5"><strong>Restart Server:</strong> Stop and restart your Next.js development server.</li>,
+        <li key="step5"><strong>Restart Server & Refresh:</strong> Stop and restart your Next.js development server, then hard refresh your browser.</li>,
         <li key="step6"><strong>Check Project ID:</strong> Ensure <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code> in your <code>.env.local</code> file exactly matches <strong><code>{displayProjectId}</code></strong>.</li>
       ];
     } else if (firebaseError.code === 'unavailable' || (firebaseError.message && firebaseError.message.includes('client is offline'))) {
@@ -53,12 +113,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       errorMessage = `The application could not connect to Cloud Firestore for project "${displayProjectId}". This might be due to recent API enablement, a network issue, or the Firestore database instance not being fully ready.`;
        troubleshootingSteps = [
         <li key="step1"><strong>If Firestore API was just enabled/Database created:</strong> Please wait 10-20 minutes for the changes to propagate across Google's systems.</li>,
-        <li key="step2"><strong>Restart Server:</strong> Stop and restart your Next.js development server.</li>,
-        <li key="step3"><strong>Check Network:</strong> Ensure your server has a stable internet connection.</li>,
+        <li key="step2"><strong>Restart Server & Refresh:</strong> Stop and restart your Next.js development server, then hard refresh your browser.</li>,
+        <li key="step3"><strong>Check Network:</strong> Ensure your device has a stable internet connection.</li>,
         <li key="step4"><strong>Verify Setup:</strong> Double-check that the Cloud Firestore API is enabled and a Firestore Database instance exists for project <strong><code>{displayProjectId}</code></strong> using the links above.</li>
       ];
     } else if (profileError.message && profileError.message.includes("Firebase Initialization Failed")) {
-      // Handle the specific error thrown by our firebase.ts if env vars are missing
       errorTitle = "Firebase Configuration Error";
       errorMessage = "The application could not start due to missing Firebase configuration. Please check the server logs for details and ensure all NEXT_PUBLIC_FIREBASE_ environment variables are set in your .env.local file.";
       troubleshootingSteps = [
@@ -68,7 +127,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <li key="env4">Check the terminal output (server logs) for detailed error messages from the Firebase setup script.</li>
       ];
     }
-
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 md:p-8">
@@ -91,22 +149,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           )}
           <div className="mt-6 text-center">
              <p className="text-sm text-red-600">If the issue persists after trying these steps, please contact support or check the Firebase/Google Cloud status pages.</p>
+             <Button onClick={() => window.location.reload()} className="mt-4">Try Reloading</Button>
           </div>
         </div>
       </div>
     );
   }
-
-  // TODO: Implement proper currentPath detection if server-side redirects are needed for role selection.
-  // For now, client-side navigation handles this.
-  // if (userProfile && !userProfile.role && currentPath !== '/role-selection') {
-  //   redirect('/role-selection');
-  // }
-  // if (!userProfile && currentPath !== '/role-selection' && currentPath !== '/login' && currentPath !== '/signup') {
-  //    Consider redirecting to login or role-selection if no profile and not on an auth page.
-  //    redirect('/login'); // Or '/role-selection' depending on flow
-  // }
-
 
   return (
     <SidebarProvider>
@@ -122,3 +170,4 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+

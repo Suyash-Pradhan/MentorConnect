@@ -84,11 +84,11 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
         const newProfile: Profile = {
           id: firebaseUser.uid,
-          email: firebaseUser.email || data.email,
+          email: firebaseUser.email || data.email, // Use actual email
           role: null,
-          name: firebaseUser.displayName || "",
-          avatarUrl: firebaseUser.photoURL || "",
-          createdAt: new Date(), // Will be converted to serverTimestamp by setProfile if new
+          name: firebaseUser.displayName || "", // Use display name from auth if available
+          avatarUrl: firebaseUser.photoURL || "", // Use photo URL from auth if available
+          createdAt: new Date(),
         };
         await setProfile(firebaseUser.uid, newProfile);
 
@@ -108,7 +108,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             description: "Welcome back to MentorConnect.",
           });
           if (!userProfile.name) {
-            router.push("/profile?edit=true");
+            router.push("/profile?edit=true&from=login_name_missing");
           } else {
             router.push("/dashboard");
           }
@@ -117,11 +117,12 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             title: "Login Successful!",
             description: "Please select your role to continue.",
           });
-           if (!userProfile) { // Should not happen if signup is robust
+           if (!userProfile) {
              const profileToEnsure: Profile = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || data.email,
                 name: firebaseUser.displayName || "",
+                avatarUrl: firebaseUser.photoURL || "",
                 role: null,
                 createdAt: new Date(),
              };
@@ -136,6 +137,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         switch (error.code) {
           case "auth/email-already-in-use":
             errorMessage = "This email address is already in use.";
+            // No console.error for this specific, common case
             break;
           case "auth/invalid-email":
             errorMessage = "The email address is not valid.";
@@ -154,14 +156,20 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
           case "auth/invalid-credential":
             errorMessage = "Invalid email or password.";
             break;
+          case "auth/invalid-api-key":
+            errorMessage = "Firebase API Key is invalid. Please check your app configuration.";
+            console.error("Authentication error: Firebase API Key is invalid.", error);
+            break;
           default:
-            if (error.code !== "auth/email-already-in-use") {
-              console.error("Authentication error:", error);
-            }
+            // Log other Firebase errors
+             if (error.code !== 'auth/popup-closed-by-user') { // for google sign in
+                 console.error("Authentication error:", error);
+             }
             errorMessage = error.message || errorMessage;
         }
       } else {
-        console.error("Authentication error:", error);
+        // Log non-Firebase errors
+        console.error("Non-Firebase authentication error:", error);
       }
       toast({
         variant: "destructive",
@@ -224,23 +232,29 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
       } else {
         if (userProfile.role) {
           toast({ title: "Signed in with Google", description: `Welcome back, ${userProfile.name || 'User'}!` });
-           if (!userProfile.name) {
-            router.push("/profile?edit=true");
+           if (!userProfile.name) { // If name is still missing even if role is set
+            router.push("/profile?edit=true&from=google_name_missing");
           } else {
             router.push("/dashboard");
           }
-        } else {
+        } else { // Role is null
           toast({ title: "Signed in with Google", description: "Please select your role to continue." });
           router.push("/role-selection");
         }
       }
     } catch (error: any) {
-      console.error("Google Sign-In error:", error);
       let gMessage = "Could not sign in with Google. Please try again.";
       if (error.code === 'auth/popup-closed-by-user') {
         gMessage = "Google Sign-In cancelled.";
+        // Don't log this to console as it's a user action
       } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/unauthorized-domain') {
         gMessage = "Google Sign-In is not enabled for this app. Please contact support or check Firebase console setup.";
+        console.error("Google Sign-In error:", error);
+      } else if (error.code === 'auth/invalid-api-key') {
+        gMessage = "Firebase API Key is invalid for Google Sign-In. Please check your app configuration.";
+        console.error("Google Sign-In error: Firebase API Key is invalid.", error);
+      } else {
+        console.error("Google Sign-In error:", error);
       }
       toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage });
     } finally {
@@ -388,3 +402,4 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
     </>
   );
 }
+

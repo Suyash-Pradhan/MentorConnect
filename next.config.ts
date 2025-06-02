@@ -52,6 +52,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:buffer'] = false;
       config.resolve.fallback.https = false;
       config.resolve.fallback['node:https'] = false;
+      config.resolve.fallback.http = false;
+      config.resolve.fallback['node:http'] = false;
 
 
       // Add IgnorePlugin for node: prefixed modules ONLY
@@ -80,6 +82,11 @@ const nextConfig: NextConfig = {
         config.plugins.push(
           new webpack.IgnorePlugin({
             resourceRegExp: /^node:https$/,
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:http$/,
           })
         );
       }

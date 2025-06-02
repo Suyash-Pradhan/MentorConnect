@@ -7,6 +7,7 @@ export interface User {
   role: Role | null; // null if not yet selected
   name?: string;
   avatarUrl?: string;
+  bannerUrl?: string; // Added bannerUrl
   createdAt: Date;
 }
 
@@ -129,3 +130,4 @@ export interface ChatSession {
   // studentUnreadCount?: number;
   // alumniUnreadCount?: number;
 }
+

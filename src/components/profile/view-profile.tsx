@@ -92,12 +92,12 @@ export function ViewProfile({ profile, currentUserProfile, onMentorshipRequest }
     <Card className="w-full shadow-lg overflow-hidden">
       <div className="relative h-48 bg-gradient-to-r from-primary to-accent">
          <Image 
-            src="https://placehold.co/800x400.png"
+            src={profile.bannerUrl || "https://placehold.co/1200x300.png"} // Use profile.bannerUrl or placeholder
             alt={`${profile.name || 'User'}'s cover photo`}
             layout="fill"
             objectFit="cover"
-            className="opacity-50"
-            data-ai-hint="abstract background"
+            className="opacity-80" // Slightly reduced opacity to let gradient show
+            data-ai-hint="profile banner background"
           />
         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 p-1 bg-background rounded-full shadow-md">
           <Avatar className="h-32 w-32 border-4 border-background">

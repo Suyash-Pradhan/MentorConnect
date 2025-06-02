@@ -14,12 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { createPost } from "@/services/postService";
-import type { Profile, Post } from "@/types";
-import { getProfile } from "@/services/profileService"; // To get current user for author details
+import type { Post } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+import { useUserProfile } from "@/contexts/user-profile-context";
 
 const postFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100),
@@ -37,9 +34,8 @@ type PostFormValues = z.infer<typeof postFormSchema>;
 export default function CreatePostPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
-  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
+  const { userProfile, profileLoading, profileError } = useUserProfile();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -55,33 +51,17 @@ export default function CreatePostPage() {
     },
   });
 
-  React.useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsCheckingAuth(true);
-      try {
-        const profile = await getProfile(MOCK_CURRENT_USER_ID);
-        setCurrentUser(profile);
-      } catch (error) {
-        console.error("Failed to fetch current user profile:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not load user data." });
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    };
-    fetchCurrentUser();
-  }, [toast]);
-
   const onSubmit = async (values: PostFormValues) => {
-    if (!currentUser || currentUser.role !== 'alumni') {
+    if (!userProfile || userProfile.role !== 'alumni') {
       toast({ variant: "destructive", title: "Unauthorized", description: "Only alumni can create posts." });
       return;
     }
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
-      const postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'commentsCount'> = {
-        authorId: currentUser.id,
-        authorName: currentUser.name || "Alumni User",
-        authorAvatar: currentUser.avatarUrl,
+      const postData: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'commentsCount' | 'likedBy'> = {
+        authorId: userProfile.id,
+        authorName: userProfile.name || "Alumni User",
+        authorAvatar: userProfile.avatarUrl,
         title: values.title,
         content: values.content,
         category: values.category,
@@ -98,11 +78,11 @@ export default function CreatePostPage() {
       console.error("Failed to create post:", error);
       toast({ variant: "destructive", title: "Creation Failed", description: "Could not create post." });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (isCheckingAuth) {
+  if (profileLoading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6">
         <Card className="max-w-3xl mx-auto">
@@ -121,7 +101,18 @@ export default function CreatePostPage() {
     );
   }
 
-  if (!currentUser || currentUser.role !== 'alumni') {
+  if (profileError) {
+    return (
+      <div className="container mx-auto py-12 px-4 md:px-6 text-center">
+        <Icons.warning className="h-16 w-16 mx-auto text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive">Error Loading Profile</h1>
+        <p className="text-muted-foreground mt-2">Could not load your user data. Please try again later.</p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-6">Back to Dashboard</Button>
+      </div>
+    );
+  }
+
+  if (!userProfile || userProfile.role !== 'alumni') {
     return (
       <div className="container mx-auto py-12 px-4 md:px-6 text-center">
         <Icons.warning className="h-16 w-16 mx-auto text-destructive mb-4" />
@@ -240,8 +231,8 @@ export default function CreatePostPage() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
                 Publish Post
               </Button>
             </CardFooter>

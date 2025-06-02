@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
@@ -9,7 +10,7 @@ import Link from 'next/link';
 import type { Post } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { getPostsByAuthor, deletePost } from '@/services/postService'; // Import services
+import { getPostsByAuthor, deletePost } from '@/services/postService';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -23,21 +24,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-
-// Simulate current alumni user - replace with actual auth context
-const MOCK_CURRENT_ALUMNI_ID = "alumni456"; // In a real app, this ID would come from auth state
+import { useUserProfile } from "@/contexts/user-profile-context";
 
 export default function MyOpportunitiesPage() {
   const { toast } = useToast();
+  const router = useRouter();
+  const { userProfile, profileLoading, profileError } = useUserProfile();
   const [myPosts, setMyPosts] = React.useState<Post[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingPosts, setIsLoadingPosts] = React.useState(true);
 
-  const fetchMyPosts = React.useCallback(async () => {
-    setIsLoading(true);
+  const fetchMyPosts = React.useCallback(async (authorId: string) => {
+    setIsLoadingPosts(true);
     try {
-      // TODO: Replace MOCK_CURRENT_ALUMNI_ID with actual authenticated user ID
-      const posts = await getPostsByAuthor(MOCK_CURRENT_ALUMNI_ID);
+      const posts = await getPostsByAuthor(authorId);
       setMyPosts(posts);
     } catch (error) {
       console.error("Failed to fetch my posts:", error);
@@ -47,19 +46,27 @@ export default function MyOpportunitiesPage() {
         description: "Could not load your shared opportunities.",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingPosts(false);
     }
   }, [toast]);
 
   React.useEffect(() => {
-    fetchMyPosts();
-  }, [fetchMyPosts]);
+    if (userProfile && userProfile.role === 'alumni') {
+      fetchMyPosts(userProfile.id);
+    } else if (!profileLoading && userProfile?.role !== 'alumni') {
+      // If profile loaded and user is not alumni, effectively stop loading and show appropriate message.
+      setIsLoadingPosts(false);
+      setMyPosts([]); // Ensure no posts are shown
+    }
+    // If profile is loading, or there's an error, the outer conditionals will handle it.
+  }, [userProfile, profileLoading, fetchMyPosts]);
 
   const handleDeletePost = async (postId: string) => {
+    if (!userProfile) return;
     try {
       await deletePost(postId);
       toast({ title: "Post Deleted", description: "Your opportunity has been deleted." });
-      fetchMyPosts(); // Refresh the list
+      fetchMyPosts(userProfile.id); // Refresh the list
     } catch (error) {
       console.error("Failed to delete post:", error);
       toast({
@@ -70,8 +77,7 @@ export default function MyOpportunitiesPage() {
     }
   };
 
-
-  if (isLoading) {
+  if (profileLoading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-6">
          <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
@@ -88,6 +94,50 @@ export default function MyOpportunitiesPage() {
     );
   }
 
+  if (profileError) {
+    return (
+      <div className="container mx-auto py-12 px-4 md:px-6 text-center">
+        <Icons.warning className="h-16 w-16 mx-auto text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive">Error Loading Profile</h1>
+        <p className="text-muted-foreground mt-2">Could not load your data for this page.</p>
+      </div>
+    );
+  }
+
+  if (!userProfile || userProfile.role !== 'alumni') {
+    return (
+      <div className="container mx-auto py-12 px-4 md:px-6 text-center">
+        <Icons.warning className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+        <h1 className="text-2xl font-bold">Access Restricted</h1>
+        <p className="text-muted-foreground mt-2">This page is for alumni to manage their shared opportunities.</p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-6">Go to Dashboard</Button>
+      </div>
+    );
+  }
+
+  // User is alumni, now check if posts are loading or empty
+  if (isLoadingPosts) {
+     return (
+      <div className="container mx-auto py-8 px-4 md:px-6">
+         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 className="text-4xl font-bold text-foreground">My Shared Opportunities</h1>
+                <p className="text-lg text-muted-foreground">Manage the posts, job openings, and guidance you&apos;ve shared.</p>
+            </div>
+            <Button asChild>
+                <Link href="/posts/create">
+                    <Icons.add className="mr-2 h-4 w-4" /> Share New Opportunity
+                </Link>
+            </Button>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => <OpportunityCardSkeleton key={i} />)}
+        </div>
+      </div>
+    );
+  }
+
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
@@ -96,7 +146,7 @@ export default function MyOpportunitiesPage() {
             <p className="text-lg text-muted-foreground">Manage the posts, job openings, and guidance you&apos;ve shared.</p>
         </div>
         <Button asChild>
-            <Link href="/posts/create"> {/* TODO: Implement /posts/create page */}
+            <Link href="/posts/create">
                 <Icons.add className="mr-2 h-4 w-4" /> Share New Opportunity
             </Link>
         </Button>
@@ -134,9 +184,6 @@ interface OpportunityCardProps {
 }
 
 function OpportunityCard({ post, onDeleteConfirm }: OpportunityCardProps) {
-  // Add a placeholder for views/engagement if available
-  const engagementMetric = Math.floor(Math.random() * 200) + 50; // Random views for demo
-
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow">
       <CardHeader>
@@ -148,18 +195,17 @@ function OpportunityCard({ post, onDeleteConfirm }: OpportunityCardProps) {
         </div>
         <CardDescription>
           Shared {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-          {post.updatedAt && post.updatedAt.getTime() !== post.createdAt.getTime() && (
+          {post.updatedAt && new Date(post.updatedAt).getTime() !== new Date(post.createdAt).getTime() && (
             <span className="text-xs text-muted-foreground italic"> (edited {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })})</span>
           )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground line-clamp-3">{post.content}</p>
-        {/* <p className="text-sm text-primary mt-2 font-medium">{engagementMetric} views/engagements</p> */}
       </CardContent>
       <CardFooter className="border-t pt-4 flex justify-end gap-2">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/posts/${post.id}/edit`}> {/* TODO: Implement edit route */}
+          <Link href={`/posts/${post.id}/edit`}>
             <Icons.edit className="mr-2 h-4 w-4" /> Edit
           </Link>
         </Button>
@@ -203,7 +249,6 @@ const OpportunityCardSkeleton = () => (
     <CardContent className="space-y-2">
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-5/6" />
-      {/* <Skeleton className="h-4 w-1/3 mt-2" /> */}
     </CardContent>
     <CardFooter className="border-t pt-4 flex justify-end gap-2">
       <Skeleton className="h-8 w-20" />

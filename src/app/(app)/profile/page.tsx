@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams, useRouter } from "next/navigation"; // Added useRouter
+import { useSearchParams, useRouter } from "next/navigation";
 import { ViewProfile } from "@/components/profile/view-profile";
 import { EditProfileForm } from "@/components/profile/edit-profile-form";
 import { Button } from "@/components/ui/button";
@@ -20,40 +20,27 @@ import { getProfile, setProfile } from "@/services/profileService";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/firebase"; 
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
+// Removed: onAuthStateChanged, type User as FirebaseUser - AppLayout handles auth state
 
 export default function ProfilePage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [profileData, setProfileData] = React.useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For this page's specific loading
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = React.useState(true);
 
   // For demo purposes if role is not set, allows toggling form view
   const [displayRole, setDisplayRole] = React.useState<'student' | 'alumni'>('student');
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setAuthLoading(false); // Auth state is now determined
-    });
-    return () => unsubscribe();
-  }, []); // Runs once on mount
-
-  React.useEffect(() => {
-    if (!authLoading && !firebaseUser) {
-      // If auth check is complete and there's no user, redirect.
+    // AppLayout ensures auth.currentUser is populated.
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
       toast({ variant: "destructive", title: "Not Authenticated", description: "Please log in to view your profile." });
       router.push('/login');
+      return;
     }
-  }, [authLoading, firebaseUser, router, toast]);
-
-
-  React.useEffect(() => {
-    if (authLoading || !firebaseUser) return; // Wait for Firebase auth and user
 
     const fetchProfileData = async () => {
       setIsLoading(true);
@@ -66,19 +53,27 @@ export default function ProfilePage() {
           if (fetchedProfile.role) {
             setDisplayRole(fetchedProfile.role as 'student' | 'alumni');
           }
-          // Auto-open dialog if name or role is missing for an existing profile
-          if ((!fetchedProfile.name || !fetchedProfile.role) && searchParams.get('edit') !== 'false') {
-            setIsEditDialogOpen(true);
-            if (!fetchedProfile.name && !fetchedProfile.role) {
-                 toast({ title: "Complete Your Profile", description: "Please provide your name, select your role, and fill in other details."});
-            } else if (!fetchedProfile.name) {
-              toast({ title: "Complete Your Profile", description: "Please provide your name and other relevant details."});
-            } else { // Only role missing (name must be present)
-              toast({ title: "Select Your Role", description: "Please select your role and complete your profile details."});
-            }
-          } else if (searchParams.get('edit') === 'true') { // Or if URL explicitly requests edit
+          
+          const editParam = searchParams.get('edit');
+          const fromParam = searchParams.get('from');
+
+          if ( (editParam === 'true' && fromParam === 'dashboard' && !fetchedProfile.name) || 
+               (editParam === 'true' && fromParam === 'layout_name_missing' && !fetchedProfile.name) ||
+               (editParam === 'true' && !fromParam && (!fetchedProfile.name || !fetchedProfile.role) )
+             ) {
+                setIsEditDialogOpen(true);
+                if (!fetchedProfile.name && !fetchedProfile.role) {
+                    toast({ title: "Complete Your Profile", description: "Please provide your name, select your role, and fill in other details."});
+                } else if (!fetchedProfile.name) {
+                    toast({ title: "Complete Your Profile", description: "Please provide your name and other relevant details."});
+                } else if (!fetchedProfile.role) { // Only role missing
+                    toast({ title: "Select Your Role", description: "Please select your role and complete your profile details."});
+                }
+          } else if (editParam === 'true' && !fromParam) { // Generic edit request
              setIsEditDialogOpen(true);
           }
+
+
         } else { 
           const defaultNewProfile: Profile = {
             id: firebaseUser.uid,
@@ -102,10 +97,11 @@ export default function ProfilePage() {
     };
 
     fetchProfileData();
-  }, [firebaseUser, authLoading, toast, searchParams, router]); // authLoading ensures this runs after auth state is known
+  }, [searchParams, router, toast]); // Dependencies: searchParams for ?edit=true, router, toast
 
 
   const handleSaveProfile = async (data: Partial<Omit<Profile, 'id' | 'createdAt' | 'email'>>) => {
+    const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
       toast({ variant: "destructive", title: "Error", description: "Not authenticated. Cannot save profile."});
       return;
@@ -117,7 +113,7 @@ export default function ProfilePage() {
         return;
     }
     
-    setIsLoading(true);
+    setIsLoading(true); // Use page-level loading for save operation
 
     const roleToSave = data.role || profileData.role || (profileData.role === null ? displayRole : null);
     if (!roleToSave) {
@@ -154,6 +150,8 @@ export default function ProfilePage() {
         industry: data.industry || profileData.alumniProfile?.industry || '',
         linkedinUrl: data.linkedinUrl || profileData.alumniProfile?.linkedinUrl || '',
       } : undefined, 
+      // Ensure createdAt is preserved if it exists, or set if new (though setProfile handles it)
+      createdAt: profileData.createdAt || new Date(), 
     };
 
     try {
@@ -162,9 +160,14 @@ export default function ProfilePage() {
       setDisplayRole(roleToSave as 'student' | 'alumni'); 
       setIsEditDialogOpen(false);
       toast({ title: "Profile Saved", description: "Your profile has been updated." });
-      if (searchParams.get('edit') === 'true' || !updatedProfileData.name || !updatedProfileData.role) {
-        router.replace('/profile', { scroll: false });
+      
+      // Clean up URL query params if they were for forcing edit mode
+      const currentEdit = searchParams.get('edit');
+      const currentFrom = searchParams.get('from');
+      if (currentEdit || currentFrom) {
+        router.replace('/profile', { scroll: false }); 
       }
+
     } catch (error) {
       console.error("Failed to save profile:", error);
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save profile." });
@@ -179,7 +182,7 @@ export default function ProfilePage() {
   };
 
 
-  if (authLoading || (isLoading && !profileData && firebaseUser)) { 
+  if (isLoading && !profileData) { 
     return (
       <div className="w-full space-y-6">
         <div className="flex justify-between items-center">
@@ -191,8 +194,8 @@ export default function ProfilePage() {
     );
   }
   
-  if (!firebaseUser && !authLoading) {
-    // This case should be handled by the redirect useEffect, but as a fallback:
+  // This check is mostly a fallback; AppLayout should prevent unauth access.
+  if (!auth.currentUser && !isLoading) { 
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -212,7 +215,7 @@ export default function ProfilePage() {
     );
   }
   
-  if (!profileData) {
+  if (!profileData) { // Should be caught by above, but as a final fallback
       return <Skeleton className="h-[500px] w-full" />; 
   }
 
@@ -228,13 +231,12 @@ export default function ProfilePage() {
           : undefined,
   };
 
-
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
         <div className="flex items-center gap-2">
-          {profileData.role === null && firebaseUser && isEditDialogOpen && (
+          {profileData.role === null && auth.currentUser && isEditDialogOpen && (
             <>
               <span className="text-sm text-muted-foreground">Form View:</span>
               <Button variant="outline" size="sm" onClick={handleToggleDisplayRole}>
@@ -242,7 +244,7 @@ export default function ProfilePage() {
               </Button>
             </>
           )}
-          {firebaseUser && ( 
+          {auth.currentUser && ( 
             <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
                 setIsEditDialogOpen(open);
                 if (!open && (searchParams.get('edit') || !profileData.name || !profileData.role)) { 
@@ -281,8 +283,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-    
-
-    
-
-    

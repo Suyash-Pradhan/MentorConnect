@@ -4,9 +4,9 @@
 import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname } from 'next/navigation';
 import { Icons } from '@/components/icons';
-import { Button } from '@/components/ui/button'; // For potential error button
+import { Button } from '@/components/ui/button';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -15,80 +15,29 @@ import type { Profile } from '@/types';
 import { getProfile } from '@/services/profileService';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function AppLayout({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(true); // Start true for initial load
-  const [profileError, setProfileError] = useState<any>(null);
+const FullPageSkeleton = () => (
+  <SidebarProvider>
+    <div className="flex min-h-screen flex-col w-full">
+      <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm h-16 flex items-center">
+         <Skeleton className="h-8 w-8 ml-4" />
+         <Skeleton className="h-6 w-24 ml-4" />
+         <div className="flex-grow" />
+         <Skeleton className="h-9 w-9 mr-4 rounded-full" />
+      </header>
+      <div className="flex flex-1 w-full">
+        <aside className="hidden md:block w-16 lg:w-64 border-r p-4 space-y-4">
+            {Array.from({length: 5}).map((_,i) => <Skeleton key={i} className="h-8 w-full" />)}
+        </aside>
+        <main className="flex-grow p-6"><Skeleton className="h-64 w-full" /></main>
+      </div>
+    </div>
+  </SidebarProvider>
+);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
-        setProfileLoading(true);
-        setProfileError(null); // Reset error on new auth state
-        try {
-          const profile = await getProfile(user.uid);
-          setUserProfile(profile);
-
-          // Handle initial redirection logic if necessary, though primary redirection should be handled by login/signup/role-selection pages
-          if (profile && !profile.role && pathname !== '/role-selection') {
-            // router.push('/role-selection'); // Might cause loops if not careful
-          } else if (profile && profile.role && !profile.name && pathname !== '/profile' && !pathname.startsWith('/profile?edit=true')) {
-             // router.push('/profile?edit=true&from=layout_name_missing');
-          }
-
-        } catch (e) {
-          console.error("[AppLayout] Error fetching profile in onAuthStateChanged:", e);
-          setProfileError(e);
-          setUserProfile(null);
-        } finally {
-          setProfileLoading(false);
-        }
-      } else {
-        setUserProfile(null);
-        setProfileLoading(false);
-        // If not on an auth page or homepage, redirect to login
-        if (!['/login', '/signup', '/'].includes(pathname)) {
-           // router.push('/login'); // Can be aggressive, consider user experience
-        }
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router, pathname]);
-
-
-  if (authLoading || (firebaseUser && profileLoading && !userProfile && !profileError) ) {
-    // Show a basic loading skeleton for the whole layout
-    return (
-      <SidebarProvider>
-        <div className="flex min-h-screen flex-col w-full">
-          <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm h-16 flex items-center">
-             <Skeleton className="h-8 w-8 ml-4" />
-             <Skeleton className="h-6 w-24 ml-4" />
-             <div className="flex-grow" />
-             <Skeleton className="h-9 w-9 mr-4 rounded-full" />
-          </header>
-          <div className="flex flex-1 w-full">
-            <aside className="hidden md:block w-16 lg:w-64 border-r p-4 space-y-4">
-                {Array.from({length: 5}).map((_,i) => <Skeleton key={i} className="h-8 w-full" />)}
-            </aside>
-            <main className="flex-grow p-6"><Skeleton className="h-64 w-full" /></main>
-          </div>
-        </div>
-      </SidebarProvider>
-    );
-  }
-
-  // Error display for Firestore issues, adapted from original server component logic
-  if (profileError && firebaseUser) { // Only show this error if a user is logged in but profile fetch failed
-    const firebaseError = profileError as any;
+const FirestoreErrorDisplay = ({ error }: { error: any }) => {
+    const firebaseError = error as any;
     let errorTitle = "Application Error";
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
     let troubleshootingSteps: React.ReactNode[] = [];
@@ -117,7 +66,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <li key="step3"><strong>Check Network:</strong> Ensure your device has a stable internet connection.</li>,
         <li key="step4"><strong>Verify Setup:</strong> Double-check that the Cloud Firestore API is enabled and a Firestore Database instance exists for project <strong><code>{displayProjectId}</code></strong> using the links above.</li>
       ];
-    } else if (profileError.message && profileError.message.includes("Firebase Initialization Failed")) {
+    } else if (error.message && error.message.includes("Firebase Initialization Failed")) {
       errorTitle = "Firebase Configuration Error";
       errorMessage = "The application could not start due to missing Firebase configuration. Please check the server logs for details and ensure all NEXT_PUBLIC_FIREBASE_ environment variables are set in your .env.local file.";
       troubleshootingSteps = [
@@ -127,7 +76,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <li key="env4">Check the terminal output (server logs) for detailed error messages from the Firebase setup script.</li>
       ];
     }
-
+    
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 md:p-8">
         <div className="max-w-2xl w-full bg-white shadow-2xl rounded-lg p-6 md:p-10 border-2 border-red-300">
@@ -137,7 +86,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <p className="text-md mb-3">{errorMessage}</p>
           <p className="text-sm text-red-600 mb-4">
-            <strong>Raw Error:</strong> {profileError.message}
+            <strong>Raw Error:</strong> {error.message}
           </p>
           {troubleshootingSteps.length > 0 && (
             <>
@@ -154,8 +103,112 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+};
+
+
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<any>(null);
+
+  // Effect for Firebase auth subscription
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setAuthLoading(false); // Auth state is now determined
+    });
+    return () => unsubscribe();
+  }, []); // Runs once on mount to set up listener
+
+  // Effect for fetching profile WHEN firebaseUser changes
+  useEffect(() => {
+    if (firebaseUser) {
+      setProfileLoading(true);
+      setProfileError(null);
+      getProfile(firebaseUser.uid)
+        .then(profile => {
+          setUserProfile(profile);
+        })
+        .catch(e => {
+          console.error("[AppLayout] Error fetching profile:", e);
+          setProfileError(e);
+          setUserProfile(null);
+        })
+        .finally(() => {
+          setProfileLoading(false);
+        });
+    } else {
+      setUserProfile(null); // Clear profile if firebaseUser becomes null
+      setProfileLoading(false); // No profile to load
+    }
+  }, [firebaseUser]); // Runs when firebaseUser changes
+
+  // Effect for redirecting if NOT authenticated
+  useEffect(() => {
+    if (!authLoading && !firebaseUser) {
+      // If auth check is complete and there's no user,
+      // and we are not on a public/auth page, redirect to login.
+      const publicPaths = ['/login', '/signup', '/']; // Add any other public paths
+      if (!publicPaths.includes(pathname)) {
+        router.push('/login');
+      }
+    }
+  }, [authLoading, firebaseUser, pathname, router]);
+
+
+  if (authLoading) {
+    return <FullPageSkeleton />;
   }
 
+  // If auth check is complete, but no user, and we're on a protected route,
+  // the redirect effect will handle it. We can return a skeleton or null here
+  // to prevent rendering children prematurely.
+  const publicPaths = ['/login', '/signup', '/'];
+  if (!firebaseUser && !publicPaths.includes(pathname)) {
+    return <FullPageSkeleton />; // Or null; redirect is in progress or will occur
+  }
+
+  // If user is authenticated, but profile is still loading
+  if (firebaseUser && profileLoading) {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen flex-col w-full">
+          <AppHeader userProfile={null} /> {/* Pass null or partial profile if needed */}
+          <div className="flex flex-1 w-full">
+            <AppSidebar userProfile={null} />
+            <SidebarInset className="p-4 md:p-6 lg:p-8">
+              <div className="w-full h-64 flex items-center justify-center">
+                 <Icons.spinner className="h-10 w-10 animate-spin text-primary" />
+              </div>
+            </SidebarInset>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+  
+  // Handle profile error for an authenticated user
+  if (firebaseUser && profileError) {
+     return (
+        <SidebarProvider>
+            <div className="flex min-h-screen flex-col w-full">
+                <AppHeader userProfile={null} />
+                <div className="flex flex-1 w-full">
+                    <AppSidebar userProfile={null} />
+                    <SidebarInset className="p-0"> {/* Remove padding for full-page error */}
+                         <FirestoreErrorDisplay error={profileError} />
+                    </SidebarInset>
+                </div>
+            </div>
+        </SidebarProvider>
+     );
+  }
+
+  // If authenticated and profile loaded (or no profile needed for a route that still uses AppLayout)
   return (
     <SidebarProvider>
       <div className="flex min-h-screen flex-col w-full">
@@ -170,4 +223,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
-

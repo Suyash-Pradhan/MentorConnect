@@ -1,5 +1,5 @@
 
-"use client"; // Mark as client component due to hooks and state
+"use client"; 
 
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,17 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
 import { auth } from "@/lib/firebase";
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { useRouter } from "next/navigation";
-
+// Removed: onAuthStateChanged, type User as FirebaseUser - AppLayout handles auth state
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = React.useState(true);
-  const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = React.useState(true);
   
   // Student specific data
   const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
@@ -40,29 +37,21 @@ export default function DashboardPage() {
   const [activeMenteesCount, setActiveMenteesCount] = React.useState(0);
   const [isLoadingMentorshipStats, setIsLoadingMentorshipStats] = React.useState(false);
 
-  // Mock data for parts not yet connected to DB for student (these specific stats aren't fully implemented beyond mentorship)
+  // Mock data for parts not yet connected to DB for student
   const studentDashboardStats = {
-    pendingRequests: 0, // Will be derived from mentorships for student
-    upcomingMeetings: 0, // Mock, not implemented
+    pendingRequests: 0, 
+    upcomingMeetings: 0, 
   };
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setAuthLoading(false); // Auth state is now determined
-    });
-    return () => unsubscribe();
-  }, []); // Runs once on mount
-
-  React.useEffect(() => {
-    if (!authLoading && !firebaseUser) {
-      // If auth check is complete and there's no user, redirect.
+    // AppLayout ensures auth.currentUser is populated before this page renders.
+    const firebaseUser = auth.currentUser; 
+    if (!firebaseUser) {
+      // This should ideally not happen if AppLayout is working correctly.
+      // As a fallback, redirect to login.
       router.push('/login');
+      return;
     }
-  }, [authLoading, firebaseUser, router]);
-
-  React.useEffect(() => {
-    if (authLoading || !firebaseUser) return; // Wait for Firebase auth and user
 
     const fetchProfile = async () => {
       setIsLoadingProfile(true);
@@ -76,26 +65,30 @@ export default function DashboardPage() {
             router.push('/profile?edit=true&from=dashboard');
           }
         } else {
-          router.push('/role-selection'); // Profile doesn't exist, guide to creation/role selection
+          // This case implies profile document doesn't exist in Firestore for an authenticated user.
+          // This could happen if profile creation failed during signup.
+          // Redirect to role-selection which should ideally create the profile or guide user.
+          router.push('/role-selection'); 
         }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load your profile." });
-        router.push('/login'); // Fallback to login on catastrophic profile error
+        // Fallback to login on catastrophic profile error, though AppLayout might also catch this
+        router.push('/login'); 
       } finally {
         setIsLoadingProfile(false);
       }
     };
     fetchProfile();
-  }, [firebaseUser, authLoading, toast, router]); // authLoading ensures this runs after auth state is known
+  }, [router, toast]); // Removed firebaseUser and authLoading as dependencies
 
   React.useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) return; // Data fetching depends on currentUser profile
 
     if (currentUser.role === 'student') {
       const fetchStudentData = async () => {
         setIsLoadingRecentPosts(true);
-        setIsLoadingRecommendations(true);
+        setIsLoadingRecommendations(true); // Ensure this is set for student
         try {
           const posts = await getAllPosts({ limit: 3 }); 
           setRecentPosts(posts);
@@ -109,9 +102,9 @@ export default function DashboardPage() {
         if (currentUser.studentProfile) {
           try {
             const alumniForAI = await getProfilesByRole('alumni', { limit: 50 }); 
-            if (alumniForAI.length === 0) {
+             if (alumniForAI.length === 0) {
               setRecommendedAlumni([]);
-              setIsLoadingRecommendations(false);
+              setIsLoadingRecommendations(false); // Ensure loading state is cleared
               return;
             }
 
@@ -141,7 +134,7 @@ export default function DashboardPage() {
             setIsLoadingRecommendations(false);
           }
         } else {
-          setIsLoadingRecommendations(false);
+             setIsLoadingRecommendations(false); // Ensure loading state is cleared if no student profile
         }
       };
       fetchStudentData();
@@ -155,7 +148,6 @@ export default function DashboardPage() {
          }
       };
       fetchStudentMentorshipStats();
-
 
     } else if (currentUser.role === 'alumni') {
       const fetchAlumniData = async () => {
@@ -186,9 +178,10 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [currentUser, toast]);
+  }, [currentUser, toast]); // Fetch data when currentUser profile is loaded/changed
 
-  if (authLoading || isLoadingProfile || !currentUser) { 
+  if (isLoadingProfile || !currentUser) { 
+    // AppLayout handles overall auth loading. Dashboard shows skeleton while its specific profile loads.
     return <DashboardSkeleton />;
   }
 
@@ -374,7 +367,3 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
-
-    
-
-    

@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
         hostname: 'medium.com', // Added medium.com
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'example.com', // Added example.com
+        port: '',
+        pathname: '/**',
       }
     ],
   },

@@ -41,8 +41,7 @@ export default function ProfilePage() {
       setAuthLoading(false);
       if (!user) {
         // If user logs out or is not authenticated, redirect to login
-        // You might want to adjust this behavior based on your app's flow
-        // router.push('/login'); 
+        router.push('/login'); 
       }
     });
     return () => unsubscribe();
@@ -58,7 +57,6 @@ export default function ProfilePage() {
         toast({ variant: "destructive", title: "Not Authenticated", description: "Please log in to view your profile." });
         setProfileData(null); 
         setIsLoading(false);
-        // Redirect to login if not authenticated to prevent showing a broken profile page
         router.push('/login');
         return;
       }
@@ -72,17 +70,21 @@ export default function ProfilePage() {
           if (fetchedProfile.role) {
             setDisplayRole(fetchedProfile.role as 'student' | 'alumni');
           }
+          // Auto-open dialog if name or role is missing for an existing profile
           if ((!fetchedProfile.name || !fetchedProfile.role) && searchParams.get('edit') !== 'false') {
             setIsEditDialogOpen(true);
-            if (!fetchedProfile.name) {
-              toast({ title: "Complete Your Profile", description: "Please provide your name and other details."});
-            } else if (!fetchedProfile.role) {
-              toast({ title: "Select Your Role", description: "Please select your role and complete profile details."});
+            if (!fetchedProfile.name && !fetchedProfile.role) {
+                 toast({ title: "Complete Your Profile", description: "Please provide your name, select your role, and fill in other details."});
+            } else if (!fetchedProfile.name) {
+              toast({ title: "Complete Your Profile", description: "Please provide your name and other relevant details."});
+            } else { // Only role missing (name must be present)
+              toast({ title: "Select Your Role", description: "Please select your role and complete your profile details."});
             }
-          } else if (searchParams.get('edit') === 'true') {
+          } else if (searchParams.get('edit') === 'true') { // Or if URL explicitly requests edit
              setIsEditDialogOpen(true);
           }
         } else { 
+          // No profile in Firestore yet (e.g., first login after signup, especially with Google)
           const defaultNewProfile: Profile = {
             id: firebaseUser.uid,
             email: firebaseUser.email || "email.not.found@example.com", 
@@ -122,13 +124,14 @@ export default function ProfilePage() {
     
     setIsLoading(true);
 
-    // Determine the role to save. If profileData.role is null (new user),
-    // use the role selected in the form (passed via `data.role` if EditProfileForm is adapted, or `displayRole` as fallback).
-    // For simplicity, ensure `EditProfileForm` passes the selected role if it's part of the form.
-    // Here, we'll assume `data.role` might come from the form, or use `profileData.role` or `displayRole`.
     const roleToSave = data.role || profileData.role || (profileData.role === null ? displayRole : null);
     if (!roleToSave) {
         toast({ variant: "destructive", title: "Role Required", description: "Please select a role (Student/Alumni) before saving." });
+        setIsLoading(false);
+        return;
+    }
+    if (!data.name || data.name.trim() === "") {
+        toast({ variant: "destructive", title: "Name Required", description: "Please enter your name before saving." });
         setIsLoading(false);
         return;
     }
@@ -140,13 +143,13 @@ export default function ProfilePage() {
       email: firebaseUser.email || profileData.email!, 
       name: data.name || profileData.name,
       avatarUrl: data.avatarUrl || profileData.avatarUrl,
-      role: roleToSave, // Set the role
+      role: roleToSave,
       studentProfile: roleToSave === 'student' ? {
         college: data.college || profileData.studentProfile?.college || '',
         year: data.year || profileData.studentProfile?.year || 1,
         academicInterests: Array.isArray(data.academicInterests) ? data.academicInterests : (typeof data.academicInterests === 'string' ? data.academicInterests.split(',').map(s=>s.trim()).filter(Boolean) : (profileData.studentProfile?.academicInterests || [])),
         goals: data.goals || profileData.studentProfile?.goals || '',
-      } : undefined, // Clear student profile if not student
+      } : undefined, 
       alumniProfile: roleToSave === 'alumni' ? {
         jobTitle: data.jobTitle || profileData.alumniProfile?.jobTitle || '',
         company: data.company || profileData.alumniProfile?.company || '',
@@ -155,17 +158,16 @@ export default function ProfilePage() {
         education: data.education || profileData.alumniProfile?.education || '',
         industry: data.industry || profileData.alumniProfile?.industry || '',
         linkedinUrl: data.linkedinUrl || profileData.alumniProfile?.linkedinUrl || '',
-      } : undefined, // Clear alumni profile if not alumni
+      } : undefined, 
     };
 
     try {
       await setProfile(userIdToSave, updatedProfileData);
-      setProfileData(updatedProfileData); // Update local state with the saved data
-      setDisplayRole(roleToSave as 'student' | 'alumni'); // Update displayRole if it changed
+      setProfileData(updatedProfileData); 
+      setDisplayRole(roleToSave as 'student' | 'alumni'); 
       setIsEditDialogOpen(false);
       toast({ title: "Profile Saved", description: "Your profile has been updated." });
-      // if the page was opened with ?edit=true, remove it from URL
-      if (searchParams.get('edit') === 'true') {
+      if (searchParams.get('edit') === 'true' || !updatedProfileData.name || !updatedProfileData.role) {
         router.replace('/profile', { scroll: false });
       }
     } catch (error) {
@@ -177,15 +179,8 @@ export default function ProfilePage() {
   };
 
   const handleToggleDisplayRole = () => {
-    // This function is mainly for the form when role is not yet set.
-    // The actual role is part of profileData.
     const newRole = displayRole === 'student' ? 'alumni' : 'student';
     setDisplayRole(newRole);
-    if (profileData && profileData.role === null) {
-        // If profile role is null, update the form's view
-        // This doesn't save anything, just changes what fields are shown in EditProfileForm
-        // when it's constructed based on `profileForForm`
-    }
   };
 
 
@@ -201,11 +196,7 @@ export default function ProfilePage() {
     );
   }
   
-  // If still authLoading and no firebaseUser yet, it might be too early to decide to redirect.
-  // The effect for fetchProfileData will handle redirect if firebaseUser remains null after authLoading.
-
   if (!firebaseUser && !authLoading) {
-    // This case should ideally be handled by redirect in useEffect, but as a fallback:
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -215,7 +206,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profileData && !isLoading) { // If profile data couldn't be loaded for an authenticated user (e.g. after error)
+  if (!profileData && !isLoading) { 
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -225,17 +216,14 @@ export default function ProfilePage() {
     );
   }
   
-  // This ensures profileData is not null before rendering ViewProfile or EditProfileForm
   if (!profileData) {
-      return <Skeleton className="h-[500px] w-full" />; // Or some other loading state
+      return <Skeleton className="h-[500px] w-full" />; 
   }
 
-
   const effectiveRoleForForm = profileData.role || displayRole;
-  // Construct profileForForm carefully, ensuring student/alumni profiles are only defined if role matches
   const profileForForm: Profile = {
-      ...profileData, // Includes id, email, name, avatarUrl, createdAt, role
-      role: effectiveRoleForForm, // This is the role the form will be based on
+      ...profileData,
+      role: effectiveRoleForForm, 
       studentProfile: effectiveRoleForForm === 'student' 
           ? (profileData.studentProfile || { college: '', year: 1, academicInterests: [], goals: '' }) 
           : undefined,
@@ -250,7 +238,7 @@ export default function ProfilePage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
         <div className="flex items-center gap-2">
-          {profileData.role === null && firebaseUser && (
+          {profileData.role === null && firebaseUser && isEditDialogOpen && (
             <>
               <span className="text-sm text-muted-foreground">Form View:</span>
               <Button variant="outline" size="sm" onClick={handleToggleDisplayRole}>
@@ -261,8 +249,8 @@ export default function ProfilePage() {
           {firebaseUser && ( 
             <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
                 setIsEditDialogOpen(open);
-                if (!open && searchParams.get('edit')) { // If dialog closed and edit param was there
-                    router.replace('/profile', { scroll: false }); // Remove ?edit from URL
+                if (!open && (searchParams.get('edit') || !profileData.name || !profileData.role)) { 
+                    router.replace('/profile', { scroll: false }); 
                 }
             }}>
               <DialogTrigger asChild>
@@ -275,16 +263,15 @@ export default function ProfilePage() {
                   <DialogTitle className="text-2xl">Edit Your Profile</DialogTitle>
                   <DialogDescription>
                     Make changes to your profile here. Click save when you&apos;re done.
-                    {profileData.role === null && " Start by selecting your role (Student/Alumni) and filling in your name."}
-                    {profileData.role !== null && !profileData.name && " Please start by entering your full name."}
+                    {(profileData.role === null || !profileData.name) && " Please start by entering your full name and selecting your role (Student/Alumni)."}
                   </DialogDescription>
                 </DialogHeader>
                 <EditProfileForm
-                  profile={profileForForm} // Pass the carefully constructed profileForForm
+                  profile={profileForForm} 
                   onSave={handleSaveProfile}
                   onCancel={() => {
                     setIsEditDialogOpen(false);
-                    if (searchParams.get('edit')) {
+                    if (searchParams.get('edit') || !profileData.name || !profileData.role) {
                         router.replace('/profile', { scroll: false });
                     }
                   }}

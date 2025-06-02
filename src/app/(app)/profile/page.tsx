@@ -38,29 +38,25 @@ export default function ProfilePage() {
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-      setAuthLoading(false);
-      if (!user) {
-        // If user logs out or is not authenticated, redirect to login
-        router.push('/login'); 
-      }
+      setAuthLoading(false); // Auth state is now determined
     });
     return () => unsubscribe();
-  }, [router]);
+  }, []); // Runs once on mount
 
   React.useEffect(() => {
-    if (authLoading) return; // Wait for Firebase auth state
+    if (!authLoading && !firebaseUser) {
+      // If auth check is complete and there's no user, redirect.
+      toast({ variant: "destructive", title: "Not Authenticated", description: "Please log in to view your profile." });
+      router.push('/login');
+    }
+  }, [authLoading, firebaseUser, router, toast]);
+
+
+  React.useEffect(() => {
+    if (authLoading || !firebaseUser) return; // Wait for Firebase auth and user
 
     const fetchProfileData = async () => {
       setIsLoading(true);
-
-      if (!firebaseUser) { 
-        toast({ variant: "destructive", title: "Not Authenticated", description: "Please log in to view your profile." });
-        setProfileData(null); 
-        setIsLoading(false);
-        router.push('/login');
-        return;
-      }
-
       const userIdToFetch = firebaseUser.uid; 
 
       try {
@@ -84,7 +80,6 @@ export default function ProfilePage() {
              setIsEditDialogOpen(true);
           }
         } else { 
-          // No profile in Firestore yet (e.g., first login after signup, especially with Google)
           const defaultNewProfile: Profile = {
             id: firebaseUser.uid,
             email: firebaseUser.email || "email.not.found@example.com", 
@@ -107,7 +102,7 @@ export default function ProfilePage() {
     };
 
     fetchProfileData();
-  }, [firebaseUser, authLoading, toast, searchParams, router]);
+  }, [firebaseUser, authLoading, toast, searchParams, router]); // authLoading ensures this runs after auth state is known
 
 
   const handleSaveProfile = async (data: Partial<Omit<Profile, 'id' | 'createdAt' | 'email'>>) => {
@@ -197,6 +192,7 @@ export default function ProfilePage() {
   }
   
   if (!firebaseUser && !authLoading) {
+    // This case should be handled by the redirect useEffect, but as a fallback:
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -285,6 +281,8 @@ export default function ProfilePage() {
     </div>
   );
 }
+    
+
     
 
     

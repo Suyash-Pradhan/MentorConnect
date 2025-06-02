@@ -49,16 +49,20 @@ export default function DashboardPage() {
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-      setAuthLoading(false);
-      if (!user) {
-        router.push('/login');
-      }
+      setAuthLoading(false); // Auth state is now determined
     });
     return () => unsubscribe();
-  }, [router]);
+  }, []); // Runs once on mount
 
   React.useEffect(() => {
-    if (authLoading || !firebaseUser) return;
+    if (!authLoading && !firebaseUser) {
+      // If auth check is complete and there's no user, redirect.
+      router.push('/login');
+    }
+  }, [authLoading, firebaseUser, router]);
+
+  React.useEffect(() => {
+    if (authLoading || !firebaseUser) return; // Wait for Firebase auth and user
 
     const fetchProfile = async () => {
       setIsLoadingProfile(true);
@@ -72,20 +76,18 @@ export default function DashboardPage() {
             router.push('/profile?edit=true&from=dashboard');
           }
         } else {
-          // Should be handled by signup creating a profile, but as a fallback:
-          router.push('/role-selection');
+          router.push('/role-selection'); // Profile doesn't exist, guide to creation/role selection
         }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load your profile." });
-        // Potentially redirect to login if profile load fails catastrophically
-        router.push('/login');
+        router.push('/login'); // Fallback to login on catastrophic profile error
       } finally {
         setIsLoadingProfile(false);
       }
     };
     fetchProfile();
-  }, [firebaseUser, authLoading, toast, router]);
+  }, [firebaseUser, authLoading, toast, router]); // authLoading ensures this runs after auth state is known
 
   React.useEffect(() => {
     if (!currentUser) return;
@@ -104,10 +106,8 @@ export default function DashboardPage() {
           setIsLoadingRecentPosts(false);
         }
 
-        // Fetch Smart Alumni Recommendations
         if (currentUser.studentProfile) {
           try {
-            // Fetch a limited set of alumni for AI processing to improve performance
             const alumniForAI = await getProfilesByRole('alumni', { limit: 50 }); 
             if (alumniForAI.length === 0) {
               setRecommendedAlumni([]);
@@ -129,12 +129,10 @@ export default function DashboardPage() {
             const recommendationsOutput = await getSmartAlumniRecommendations(aiInput);
             const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
             
-            // Filter the *limited* set of alumni we passed to AI, or fetch specific ones if names are reliable
-            // For simplicity, filtering the already fetched limited set.
             const filteredRecommendedAlumni = alumniForAI.filter(alumni => 
               alumni.name && recommendedNames.includes(alumni.name.toLowerCase())
             );
-            setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); // Show top 3
+            setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); 
 
           } catch (error) {
             console.error("Failed to fetch smart alumni recommendations:", error);
@@ -143,17 +141,15 @@ export default function DashboardPage() {
             setIsLoadingRecommendations(false);
           }
         } else {
-          setIsLoadingRecommendations(false); // No student profile to get recommendations
+          setIsLoadingRecommendations(false);
         }
       };
       fetchStudentData();
 
-      // Fetch student's mentorship request stats
       const fetchStudentMentorshipStats = async () => {
          try {
            const requests = await getMentorshipRequestsForUser(currentUser.id, 'student');
            studentDashboardStats.pendingRequests = requests.filter(req => req.status === 'pending').length;
-           // studentDashboardStats.upcomingMeetings could be based on accepted requests + a calendar feature (not implemented)
          } catch (error) {
             console.error("Failed to fetch student mentorship stats:", error);
          }
@@ -190,9 +186,9 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [currentUser, toast]); // Removed MOCK_CURRENT_USER_ID from dependencies
+  }, [currentUser, toast]);
 
-  if (authLoading || isLoadingProfile || !currentUser) { // Added !currentUser check
+  if (authLoading || isLoadingProfile || !currentUser) { 
     return <DashboardSkeleton />;
   }
 
@@ -378,5 +374,7 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
+
+    
 
     

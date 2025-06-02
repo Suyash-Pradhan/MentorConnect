@@ -10,13 +10,17 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
-import type { Profile } from '@/types';
+import type { Profile, ChatSession } from '@/types';
 import { getProfile } from '@/services/profileService';
-import { auth } from '@/lib/firebase';
+import { getUserChatSessions } from '@/services/chatService';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UserProfileContext } from '@/contexts/user-profile-context'; // Import the context
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { UserProfileContext } from '@/contexts/user-profile-context';
+import { NotificationsProvider, useNotifications } from '@/contexts/notifications-context'; // Import NotificationsProvider
+import { collection, query, where, onSnapshot, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+
 
 const FullPageSkeleton = () => (
   <SidebarProvider>
@@ -106,11 +110,68 @@ const FirestoreErrorDisplay = ({ error }: { error: any }) => {
     );
 };
 
+function ChatNotificationsManager({ userId }: { userId: string }) {
+  const { addNotification } = useNotifications();
+  const lastNotificationCheckTimeRef = React.useRef<Timestamp>(Timestamp.now());
+
+  React.useEffect(() => {
+    if (!userId) return;
+
+    // This timestamp helps ignore messages that existed before the listener was set up or were already processed.
+    const listenerSetupTime = Timestamp.now();
+    lastNotificationCheckTimeRef.current = listenerSetupTime;
+
+    const chatsRef = collection(db, 'chats');
+    const q = query(chatsRef, where('participantIds', 'array-contains', userId));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === "modified" || change.type === "added") {
+          const chatSession = { id: change.doc.id, ...change.doc.data() } as ChatSession;
+          
+          if (chatSession.lastMessageSenderId && 
+              chatSession.lastMessageSenderId !== userId && 
+              chatSession.lastMessageAt &&
+              (chatSession.lastMessageAt as Timestamp).toMillis() > lastNotificationCheckTimeRef.current.toMillis()
+             ) {
+            
+            // Fetch sender's profile for name
+            let senderName = "Someone";
+            if (chatSession.lastMessageSenderId) {
+                const senderProfile = await getProfile(chatSession.lastMessageSenderId);
+                senderName = senderProfile?.name || "Someone";
+            }
+
+            addNotification({
+              type: 'new_message',
+              title: `New Message from ${senderName}`,
+              text: chatSession.lastMessageText?.substring(0, 50) + (chatSession.lastMessageText && chatSession.lastMessageText.length > 50 ? "..." : "") || "View message",
+              chatId: chatSession.id,
+              senderName: senderName,
+              link: `/chat/${chatSession.id}`,
+            });
+            // Update ref to prevent re-notifying for this specific message if snapshot fires again quickly
+            if (chatSession.lastMessageAt) {
+                 lastNotificationCheckTimeRef.current = chatSession.lastMessageAt as Timestamp;
+            }
+          }
+        }
+      });
+    }, (error) => {
+      console.error("Error listening to chat sessions for notifications:", error);
+    });
+
+    return () => unsubscribe();
+  }, [userId, addNotification]);
+
+  return null; // This component does not render anything
+}
+
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast(); // Added toast
+  const { toast } = useToast();
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -159,12 +220,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [authLoading, firebaseUser, pathname, router]);
   
   const refetchUserProfile = useCallback(async () => {
-    // toast({ title: "AppLayout: Refetching profile...", description: `For user: ${firebaseUser?.uid}` });
     await fetchUserProfile(firebaseUser);
   }, [firebaseUser, fetchUserProfile]);
 
-
-  // --- Render Logic ---
 
   if (authLoading) {
     return <FullPageSkeleton />;
@@ -175,13 +233,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     if (!publicPaths.includes(pathname)) {
         return <FullPageSkeleton />; 
     }
-    // If we are on a public page, it should have its own layout.
-    // This AppLayout is for protected routes.
-    // If somehow a public page uses this, or redirect hasn't fired, this shows skeleton.
     return <FullPageSkeleton />; 
   }
 
-  // FirebaseUser exists. Now manage profile state for context.
   const userProfileContextValue = {
     userProfile,
     profileLoading,
@@ -191,27 +245,30 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <UserProfileContext.Provider value={userProfileContextValue}>
-      <SidebarProvider>
-        <div className="flex min-h-screen flex-col w-full">
-          <AppHeader userProfile={userProfile} />
-          <div className="flex flex-1 w-full">
-            <AppSidebar userProfile={userProfile} />
-            <SidebarInset className="p-0"> {/* Adjusted padding for error display */}
-              {profileLoading ? (
-                <div className="p-4 md:p-6 lg:p-8 w-full h-64 flex items-center justify-center">
-                  <Icons.spinner className="h-10 w-10 animate-spin text-primary" />
-                </div>
-              ) : profileError ? (
-                <FirestoreErrorDisplay error={profileError} />
-              ) : (
-                <div className="p-4 md:p-6 lg:p-8"> {/* Restore padding for children */}
-                  {children}
-                </div>
-              )}
-            </SidebarInset>
+      <NotificationsProvider> {/* Wrap with NotificationsProvider */}
+        {userProfile && <ChatNotificationsManager userId={userProfile.id} />}
+        <SidebarProvider>
+          <div className="flex min-h-screen flex-col w-full">
+            <AppHeader userProfile={userProfile} />
+            <div className="flex flex-1 w-full">
+              <AppSidebar userProfile={userProfile} />
+              <SidebarInset className="p-0">
+                {profileLoading ? (
+                  <div className="p-4 md:p-6 lg:p-8 w-full h-64 flex items-center justify-center">
+                    <Icons.spinner className="h-10 w-10 animate-spin text-primary" />
+                  </div>
+                ) : profileError ? (
+                  <FirestoreErrorDisplay error={profileError} />
+                ) : (
+                  <div className="p-4 md:p-6 lg:p-8">
+                    {children}
+                  </div>
+                )}
+              </SidebarInset>
+            </div>
           </div>
-        </div>
-      </SidebarProvider>
+        </SidebarProvider>
+      </NotificationsProvider>
     </UserProfileContext.Provider>
   );
 }

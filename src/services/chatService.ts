@@ -61,15 +61,24 @@ export async function getOrCreateChat(studentId: string, alumniId: string): Prom
     return querySnapshot.docs[0].id;
   } else {
     // Create new chat
-    const newChatData: Omit<ChatSession, 'id' | 'createdAt' | 'lastMessageAt'> = {
+    // Fetch profiles to store names for easier display if needed
+    const studentProfile = await getProfile(studentId);
+    const alumniProfile = await getProfile(alumniId);
+
+    const newChatData: Omit<ChatSession, 'id' | 'createdAt' | 'lastMessageAt' | 'lastMessageText' | 'lastMessageSenderId'> = {
       participantIds: participantIdsSorted,
       studentId: studentId,
       alumniId: alumniId,
+      // You can add participantNames or avatars here if you want to denormalize
+      // studentName: studentProfile?.name || "Student",
+      // alumniName: alumniProfile?.name || "Alumni",
     };
     const chatDocRef = await addDoc(chatsRef, {
       ...newChatData,
       createdAt: serverTimestamp() as FieldValue,
       lastMessageAt: serverTimestamp() as FieldValue,
+      lastMessageText: "Chat created.",
+      lastMessageSenderId: "", // Or a system ID
     });
     return chatDocRef.id;
   }
@@ -96,30 +105,32 @@ export async function sendMessage(
 
   const chatDocRef = doc(db, 'chats', chatId);
   const messagesColRef = collection(chatDocRef, 'messages');
+  
+  // Fetch sender's profile for name and avatar for the message
+  const senderProfile = await getProfile(senderId);
 
-  // Fetch sender's profile for name and avatar (optional, but good for denormalization)
-  // For simplicity here, we'll skip direct denormalization into the message object
-  // and assume the UI can fetch profiles if needed or show IDs.
-
-  const newMessageData = {
+  const newMessageData: Omit<ChatMessage, 'id' | 'createdAt'> & { createdAt: FieldValue } = {
     chatId,
     senderId,
+    senderName: senderProfile?.name || "User",
+    senderAvatar: senderProfile?.avatarUrl,
     text: text.trim(),
     createdAt: serverTimestamp() as FieldValue,
   };
 
   const messageDocRef = await addDoc(messagesColRef, newMessageData);
 
-  // Update lastMessageAt and lastMessageText on the parent chat document
+  // Update lastMessageAt, lastMessageText and lastMessageSenderId on the parent chat document
   await updateDoc(chatDocRef, {
     lastMessageAt: serverTimestamp() as FieldValue,
-    lastMessageText: text.trim(), // Storing the last message text
+    lastMessageText: text.trim(),
+    lastMessageSenderId: senderId,
   });
 
   return messageDocRef.id;
 }
 
-export async function getMessages(chatId: string, count: number = 25): Promise<ChatMessage[]> {
+export async function getMessages(chatId: string, count: number = 50): Promise<ChatMessage[]> {
   if (!chatId) return [];
 
   const messagesColRef = collection(db, 'chats', chatId, 'messages');
@@ -128,15 +139,25 @@ export async function getMessages(chatId: string, count: number = 25): Promise<C
   const querySnapshot = await getDocs(q);
   const messages: ChatMessage[] = [];
   
-  // Fetch participant profiles to enrich messages with senderName/Avatar
-  // This is a bit heavy if done for every message fetch.
-  // A more optimized approach might involve fetching profiles once per chat session on the client
-  // or denormalizing senderName/Avatar into the message document itself (at send time).
-  // For now, let's keep it simpler and fetch as needed, or the client can handle this.
-  
   querySnapshot.forEach(docSnap => {
     messages.push({ id: docSnap.id, ...convertTimestampsToDates(docSnap.data()) } as ChatMessage);
   });
 
   return messages.reverse(); // Reverse to show oldest first for typical chat display
+}
+
+export async function getUserChatSessions(userId: string): Promise<ChatSession[]> {
+    if (!userId) return [];
+    const chatsRef = collection(db, 'chats');
+    const q = query(
+        chatsRef,
+        where('participantIds', 'array-contains', userId),
+        orderBy('lastMessageAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    const sessions: ChatSession[] = [];
+    querySnapshot.forEach(docSnap => {
+        sessions.push({ id: docSnap.id, ...convertTimestampsToDates(docSnap.data()) } as ChatSession);
+    });
+    return sessions;
 }

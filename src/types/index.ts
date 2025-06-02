@@ -7,7 +7,7 @@ export interface User {
   role: Role | null; // null if not yet selected
   name?: string;
   avatarUrl?: string;
-  bannerUrl?: string; // Added bannerUrl
+  bannerUrl?: string;
   createdAt: Date;
 }
 
@@ -97,7 +97,7 @@ export interface DiscussionThread {
 }
 
 export interface Comment { // This is for Discussion Threads
-  id: string;
+  id:string;
   threadId: string;
   authorId: string;
   authorName: string;
@@ -121,13 +121,27 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string;
   participantIds: string[]; // [studentId, alumniId] - keep consistent order for querying
-  studentId: string;
-  alumniId: string;
+  studentId: string; // Added for direct querying
+  alumniId: string; // Added for direct querying
   createdAt: Date;
   lastMessageAt?: Date;
   lastMessageText?: string;
-  // Optional: unread counts if implementing that feature
+  lastMessageSenderId?: string; // ID of the user who sent the last message
+  // Optional: unread counts per user if implementing that feature on the session document
   // studentUnreadCount?: number;
   // alumniUnreadCount?: number;
 }
 
+// Notification specific types
+export interface AppNotification {
+    id: string; // Unique ID for the notification
+    type: 'new_message' | 'mentorship_request' | 'post_comment' | 'system'; // Extend as needed
+    title: string;
+    text: string; // Short text for the notification
+    chatId?: string; // If it's a new message notification
+    relatedItemId?: string; // e.g., postId, requestId
+    senderName?: string; // Name of the person triggering (e.g. chat partner)
+    timestamp: Date;
+    isRead: boolean;
+    link?: string; // Path to navigate to when clicked
+}

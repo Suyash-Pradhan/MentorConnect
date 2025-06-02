@@ -2,12 +2,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { UserNav } from "./user-nav";
 import { siteConfig } from "@/config/site";
 import { useSidebar } from "@/components/ui/sidebar";
-import type { Profile } from "@/types"; // Import Profile type
+import type { Profile, AppNotification } from "@/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +17,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useNotifications } from "@/contexts/notifications-context"; // Import useNotifications
+import { formatDistanceToNow } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 export function AppHeader({ userProfile }: { userProfile: Profile | null }) {
   const { toggleSidebar } = useSidebar();
+  const { notifications, unreadCount, markNotificationAsRead, markAllNotificationsAsRead } = useNotifications();
+  const router = useRouter();
 
-  // Placeholder for unread notifications count
-  const unreadNotificationsCount = 0; // Replace with actual count later
+  const handleNotificationClick = (notification: AppNotification) => {
+    if (notification.link) {
+      router.push(notification.link);
+    }
+    if (!notification.isRead) {
+        markNotificationAsRead(notification.id);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background shadow-sm">
@@ -50,49 +62,63 @@ export function AppHeader({ userProfile }: { userProfile: Profile | null }) {
         <div className="flex-grow" />
 
         <div className="flex items-center space-x-2 sm:space-x-3 pr-4 md:pr-6">
-          {userProfile && ( // Only show notifications bell if user is logged in
-            <DropdownMenu>
+          {userProfile && (
+            <DropdownMenu onOpenChange={(open) => { if(!open && unreadCount > 0) markAllNotificationsAsRead(); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative h-9 w-9">
                   <Icons.bell className="h-5 w-5" />
-                  {unreadNotificationsCount > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-                      {unreadNotificationsCount}
-                    </span>
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 px-1.5 py-0.5 text-xs rounded-full h-auto"
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Badge>
                   )}
                   <span className="sr-only">Notifications</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-80" align="end">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuContent className="w-80 sm:w-96" align="end">
+                <DropdownMenuLabel className="flex justify-between items-center">
+                  <span>Notifications</span>
+                  {notifications.length > 0 && (
+                    <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={markAllNotificationsAsRead} disabled={unreadCount === 0}>
+                      Mark all as read
+                    </Button>
+                  )}
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {/* Placeholder notifications */}
-                <div className="p-2 max-h-80 overflow-y-auto">
-                  {unreadNotificationsCount === 0 ? (
-                     <DropdownMenuItem disabled className="text-sm text-muted-foreground text-center justify-center">
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                     <DropdownMenuItem disabled className="text-sm text-muted-foreground text-center justify-center py-4">
                        No new notifications
                      </DropdownMenuItem>
                   ) : (
-                    <>
-                      {/* Example notification items - replace with dynamic data */}
-                      <DropdownMenuItem className="flex flex-col items-start !cursor-default">
-                        <p className="font-semibold text-sm">New Mentorship Request</p>
-                        <p className="text-xs text-muted-foreground">From John Doe</p>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="flex flex-col items-start !cursor-default">
-                        <p className="font-semibold text-sm">New Message in Chat</p>
-                        <p className="text-xs text-muted-foreground">With Jane Smith</p>
-                      </DropdownMenuItem>
-                    </>
+                    notifications.map(notif => (
+                      <React.Fragment key={notif.id}>
+                        <DropdownMenuItem
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`flex flex-col items-start !cursor-pointer p-3 ${!notif.isRead ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-accent'}`}
+                        >
+                          <p className={`font-semibold text-sm ${!notif.isRead ? 'text-primary' : 'text-foreground'}`}>{notif.title}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{notif.text}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(notif.timestamp, { addSuffix: true })}</p>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="last:hidden" />
+                      </React.Fragment>
+                    ))
                   )}
                 </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="justify-center !cursor-pointer">
-                  <Link href="/notifications" className="text-sm text-primary">
-                    View all notifications
-                  </Link>
-                </DropdownMenuItem>
+                {notifications.length > 0 && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="justify-center !cursor-pointer">
+                        <Link href="/notifications" className="text-sm text-primary">
+                            View all notifications (Coming Soon)
+                        </Link>
+                        </DropdownMenuItem>
+                    </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

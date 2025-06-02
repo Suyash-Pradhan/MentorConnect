@@ -30,12 +30,15 @@ const nextConfig: NextConfig = {
         "https://6000-firebase-studio-1747927102257.cluster-73qgvk7hjjadkrjeyexca5ivva.cloudworkstations.dev",
     ]
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => { // `webpack` is destructured from the context object
     if (!isServer) {
-      // Initialize fallback if it doesn't exist, then add specific fallbacks
+      // Ensure resolve and fallback objects exist
+      config.resolve = config.resolve || {};
       config.resolve.fallback = config.resolve.fallback || {};
+
+      // Standard fallbacks (should handle these)
       config.resolve.fallback.async_hooks = false;
-      config.resolve.fallback['node:async_hooks'] = false; // Handles "node:async_hooks"
+      config.resolve.fallback['node:async_hooks'] = false;
       config.resolve.fallback.fs = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
@@ -43,7 +46,24 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.dns = false;
       config.resolve.fallback.child_process = false;
       config.resolve.fallback.perf_hooks = false;
-      config.resolve.fallback['node:perf_hooks'] = false; // Handles "node:perf_hooks"
+      config.resolve.fallback['node:perf_hooks'] = false;
+
+      // Add IgnorePlugin for node: prefixed modules as a stronger measure
+      // This is used when fallbacks don't suffice or to prevent
+      // even attempting to resolve/bundle these.
+      if (webpack && webpack.IgnorePlugin) { // Check if webpack and IgnorePlugin are available
+        config.plugins = config.plugins || []; // Ensure plugins array exists
+        config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:async_hooks$/,
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:perf_hooks$/,
+          })
+        );
+      }
     }
     // Important: return the modified config
     return config;

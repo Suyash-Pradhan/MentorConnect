@@ -49,7 +49,8 @@ import {
   PanelLeft,
   LayoutDashboard,
   UserCircle,
-  LifeBuoy
+  LifeBuoy,
+  Bell // Added Bell icon
 } from 'lucide-react';
 
 // Google Icon SVG Component
@@ -115,5 +116,7 @@ export const Icons = {
   ai: Sparkles,
   menu: Menu,
   panelLeft: PanelLeft,
-  google: GoogleIcon, // Added Google Icon
+  google: GoogleIcon,
+  bell: Bell, // Added Bell icon
 };
+

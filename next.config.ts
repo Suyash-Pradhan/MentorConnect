@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         hostname: 'example.com', // Added example.com
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com', // Added Cloudinary domain
+        port: '',
+        pathname: '/**',
       }
     ],
   },

@@ -17,6 +17,8 @@ import { createPost } from "@/services/postService";
 import type { Post } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserProfile } from "@/contexts/user-profile-context";
+import { uploadImageAction } from "@/actions/uploadActions"; // Import the server action
+import Image from "next/image"; // For preview
 
 const postFormSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100),
@@ -24,7 +26,7 @@ const postFormSchema = z.object({
   category: z.string().min(2, "Category is required.").max(50),
   tags: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   imageUrl: z.string().url("Invalid URL format for image.").optional().or(z.literal("")),
-  videoUrl: z.string().url("Invalid URL format for video.").optional().or(z.literal("")),
+  videoUrl: z.string().url("Invalid URL format for video.").optional().or(z.literal("")), // Stays as URL input for now
   externalLinkUrl: z.string().url("Invalid URL format for external link.").optional().or(z.literal("")),
   externalLinkText: z.string().max(100).optional(),
 });
@@ -36,13 +38,16 @@ export default function CreatePostPage() {
   const { toast } = useToast();
   const { userProfile, profileLoading, profileError } = useUserProfile();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isUploadingImage, setIsUploadingImage] = React.useState(false);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const imageFileRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
       title: "",
       content: "",
-      category: "Guidance", // Default category
+      category: "Guidance", 
       tags: "",
       imageUrl: "",
       videoUrl: "",
@@ -50,6 +55,37 @@ export default function CreatePostPage() {
       externalLinkText: "",
     },
   });
+
+  React.useEffect(() => {
+    setImagePreview(form.getValues("imageUrl") || null);
+  }, [form.watch("imageUrl")]);
+
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const result = await uploadImageAction(formData);
+      if (result.url) {
+        form.setValue("imageUrl", result.url, { shouldValidate: true });
+        setImagePreview(result.url);
+        toast({ title: "Image Uploaded", description: "Post image has been uploaded." });
+      } else if (result.error) {
+        toast({ variant: "destructive", title: "Upload Failed", description: result.error });
+         if(imageFileRef.current) imageFileRef.current.value = "";
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Upload Error", description: "An unexpected error occurred." });
+       if(imageFileRef.current) imageFileRef.current.value = "";
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const onSubmit = async (values: PostFormValues) => {
     if (!userProfile || userProfile.role !== 'alumni') {
@@ -65,7 +101,7 @@ export default function CreatePostPage() {
         title: values.title,
         content: values.content,
         category: values.category,
-        tags: values.tags as string[], // Zod transform ensures it's string[]
+        tags: values.tags as string[],
         imageUrl: values.imageUrl || undefined,
         videoUrl: values.videoUrl || undefined,
         externalLinkUrl: values.externalLinkUrl || undefined,
@@ -139,7 +175,7 @@ export default function CreatePostPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Title</FormLabel>
-                    <FormControl><Input placeholder="Enter a catchy title for your post" {...field} /></FormControl>
+                    <FormControl><Input placeholder="Enter a catchy title for your post" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -150,7 +186,7 @@ export default function CreatePostPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Content</FormLabel>
-                    <FormControl><Textarea placeholder="Write your post content here..." {...field} rows={8} /></FormControl>
+                    <FormControl><Textarea placeholder="Write your post content here..." {...field} rows={8} disabled={isSubmitting || isUploadingImage} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -162,7 +198,7 @@ export default function CreatePostPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <FormControl><Input placeholder="e.g., Job Opening, Guidance, Success Story" {...field} /></FormControl>
+                      <FormControl><Input placeholder="e.g., Job Opening, Guidance" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -173,33 +209,56 @@ export default function CreatePostPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tags</FormLabel>
-                      <FormControl><Input placeholder="e.g., Engineering, Internship, CareerAdvice" {...field} /></FormControl>
+                      <FormControl><Input placeholder="e.g., Engineering, Internship" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
                       <FormDescription>Comma-separated list of tags.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-               <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image URL (Optional)</FormLabel>
-                    <FormControl><Input placeholder="https://example.com/image.jpg" {...field} /></FormControl>
-                    <FormDescription>Link to an image to display in your post.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
+              
+              <FormItem>
+                <FormLabel>Post Image (Optional)</FormLabel>
+                {imagePreview && (
+                  <div className="my-2">
+                    <Image 
+                      src={imagePreview} 
+                      alt="Post image preview" 
+                      width={200} 
+                      height={120} 
+                      className="rounded-md object-cover border"
+                      data-ai-hint="image preview"
+                    />
+                  </div>
                 )}
-              />
+                <FormControl>
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageUpload}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    disabled={isSubmitting || isUploadingImage}
+                    ref={imageFileRef}
+                  />
+                </FormControl>
+                {isUploadingImage && <p className="text-sm text-muted-foreground flex items-center"><Icons.spinner className="mr-2 h-4 w-4 animate-spin"/>Uploading image...</p>}
+                <FormDescription>Upload an image for your post (max 5MB, JPG/PNG/GIF/WebP).</FormDescription>
+                 <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => ( <FormControl><Input type="hidden" {...field} /></FormControl> )}
+                  />
+                <FormMessage />
+              </FormItem>
+
                <FormField
                 control={form.control}
                 name="videoUrl"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Video URL (Optional)</FormLabel>
-                    <FormControl><Input placeholder="https://youtube.com/watch?v=your_video_id" {...field} /></FormControl>
-                    <FormDescription>Link to a video (e.g., YouTube, Vimeo).</FormDescription>
+                    <FormControl><Input placeholder="https://youtube.com/watch?v=your_video_id" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
+                    <FormDescription>Link to a video (e.g., YouTube, Vimeo). Direct video upload can be added later.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -211,7 +270,7 @@ export default function CreatePostPage() {
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>External Link URL (Optional)</FormLabel>
-                        <FormControl><Input placeholder="https://example.com/relevant-article" {...field} /></FormControl>
+                        <FormControl><Input placeholder="https://example.com/relevant-article" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
                         <FormMessage />
                     </FormItem>
                     )}
@@ -222,7 +281,7 @@ export default function CreatePostPage() {
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>External Link Display Text (Optional)</FormLabel>
-                        <FormControl><Input placeholder="Read more here" {...field} /></FormControl>
+                        <FormControl><Input placeholder="Read more here" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
                         <FormDescription>Text for the link if URL is provided.</FormDescription>
                         <FormMessage />
                     </FormItem>
@@ -231,8 +290,8 @@ export default function CreatePostPage() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isSubmitting || isUploadingImage}>
+                {(isSubmitting || isUploadingImage) && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
                 Publish Post
               </Button>
             </CardFooter>

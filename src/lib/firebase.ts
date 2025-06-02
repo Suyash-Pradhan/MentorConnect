@@ -7,14 +7,9 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 import { Timestamp, serverTimestamp, type FieldValue } from 'firebase/firestore';
 
-// Log the raw values at the very start to see what's available when the module loads
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_API_KEY: ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_APP_ID: ${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}`);
-console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}`);
+// Raw environment variable logs removed for security.
+// console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_API_KEY: ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`);
+// ... (other logs removed)
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -46,26 +41,25 @@ if (missingCriticalValues.length > 0) {
     const fullErrorMessage = errorIntro + errorDetails + errorGuidance;
     
     console.error(fullErrorMessage);
-    console.error("[FirebaseSetup] Firebase config object at time of error:", firebaseConfig);
+    // console.error("[FirebaseSetup] Firebase config object at time of error:", firebaseConfig); // This can also be removed if desired for extreme cleanliness
     throw new Error(fullErrorMessage);
 }
 
-console.log("[FirebaseSetup] All critical Firebase configuration values appear to be present. Proceeding with initialization.");
+// console.log("[FirebaseSetup] All critical Firebase configuration values appear to be present. Proceeding with initialization."); // Optional: remove this too
 
 let app: FirebaseApp;
 if (!getApps().length) {
   try {
-    // Use the directly constructed firebaseConfig object
-    app = initializeApp(firebaseConfig as any); // Cast as any if type complains about potentially undefined measurementId
-    console.log('[FirebaseSetup] Firebase app initialized successfully.');
+    app = initializeApp(firebaseConfig as any); 
+    // console.log('[FirebaseSetup] Firebase app initialized successfully.'); // Optional: remove
   } catch (e: any) {
     console.error("[FirebaseSetup] CRITICAL_ERROR: Failed to initialize Firebase app with the provided config:", e.message);
-    console.error("[FirebaseSetup] Firebase Config Used for initializeApp:", firebaseConfig);
+    // console.error("[FirebaseSetup] Firebase Config Used for initializeApp:", firebaseConfig); // Optional: remove
     throw new Error(`[FirebaseSetup] Failed to initialize Firebase app. Ensure config is correct and project is set up. Original error: ${e.message}`);
   }
 } else {
   app = getApp();
-  console.log('[FirebaseSetup] Existing Firebase app retrieved.');
+  // console.log('[FirebaseSetup] Existing Firebase app retrieved.'); // Optional: remove
 }
 
 const db: Firestore = getFirestore(app);

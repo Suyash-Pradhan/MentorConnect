@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import type { Post, Profile } from '@/types';
+import type { Post } from '@/types'; // Profile type removed as it comes from UserProfileContext
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -15,57 +15,53 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAllPosts } from '@/services/postService';
-import { getProfile } from '@/services/profileService';
+// import { getProfile } from '@/services/profileService'; // No longer needed for mock user
 import { useToast } from '@/hooks/use-toast';
-import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useUserProfile } from "@/contexts/user-profile-context"; // Import useUserProfile
 
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+// MOCK_CURRENT_USER_ID removed
 const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 
 export default function PostsPage() {
   const { toast } = useToast();
-  const router = useRouter(); // For clearing tag filter
-  const searchParams = useSearchParams(); // For reading tag from URL
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { userProfile, profileLoading } = useUserProfile(); // Use real user profile
 
   const [allPosts, setAllPosts] = React.useState<Post[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingPosts, setIsLoadingPosts] = React.useState(true); // Renamed for clarity
   const [searchTerm, setSearchTerm] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
-  const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [activeTagFilter, setActiveTagFilter] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const tagFromQuery = searchParams.get('tag');
     setActiveTagFilter(tagFromQuery);
+    setIsLoadingPosts(true); // Set loading true when fetching
 
-    const fetchInitialData = async () => {
-      setIsLoading(true);
+    const fetchPostsData = async () => {
       try {
-        // Pass the tag from query to getAllPosts
-        const [postsData, userProfile] = await Promise.all([
-          getAllPosts({ tag: tagFromQuery || undefined }), 
-          getProfile(MOCK_CURRENT_USER_ID)
-        ]);
+        const postsData = await getAllPosts({ tag: tagFromQuery || undefined });
         setAllPosts(postsData);
-        setCurrentUser(userProfile);
       } catch (error: any) {
-        console.error("Failed to fetch initial data:", error);
+        console.error("Failed to fetch posts data:", error);
         toast({
           variant: "destructive",
           title: "Error Loading Posts",
-          description: error.message?.includes("index") 
+          description: error.message?.includes("index")
             ? "A Firestore index is required for this query. Please check the console for a link to create it, then refresh."
             : "Could not load posts. Please try again later.",
         });
-         if (error.message?.includes("index")) {
+        if (error.message?.includes("index")) {
             console.error("Firestore index creation link (copy and paste into browser if not clickable):", error.message.substring(error.message.indexOf("https://")));
         }
       } finally {
-        setIsLoading(false);
+        setIsLoadingPosts(false); // Set loading false after fetch attempt
       }
     };
-    fetchInitialData();
-  }, [toast, searchParams]); // searchParams in dependency array to re-fetch on tag change
+    fetchPostsData();
+  }, [toast, searchParams]);
 
   const filteredPostsBySearchAndCategory = allPosts
     .filter(post => post.title.toLowerCase().includes(searchTerm.toLowerCase()) || post.content.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -76,7 +72,7 @@ export default function PostsPage() {
   }, [allPosts]);
 
 
-  if (isLoading) {
+  if (isLoadingPosts || profileLoading) { // Consider profileLoading as well for the Create Post button
     return <PostsPageSkeleton />;
   }
 
@@ -87,7 +83,7 @@ export default function PostsPage() {
           <h1 className="text-4xl font-bold text-foreground">Alumni Posts</h1>
           <p className="text-lg text-muted-foreground">Guidance, job openings, and success stories from our alumni.</p>
         </div>
-        {currentUser?.role === 'alumni' && (
+        {userProfile?.role === 'alumni' && ( // Use actual userProfile role
           <Button asChild>
             <Link href="/posts/create">
               <Icons.add className="mr-2 h-4 w-4" /> Create New Post
@@ -153,7 +149,7 @@ export default function PostsPage() {
           <Icons.posts className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold">No Posts Found</h3>
           <p className="text-muted-foreground">
-            {activeTagFilter 
+            {activeTagFilter
               ? `No posts found for the tag "${activeTagFilter}". Try clearing the filter or searching for something else.`
               : "Try adjusting your search or check back later for new posts."}
           </p>
@@ -164,7 +160,6 @@ export default function PostsPage() {
 }
 
 function PostCard({ post }: { post: Post }) {
-  // For PostCard in list view, like button is display-only. Interaction on single post page.
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
@@ -185,7 +180,7 @@ function PostCard({ post }: { post: Post }) {
         </CardTitle>
         <Badge variant="outline" className="w-fit">{post.category}</Badge>
       </CardHeader>
-      
+
       {post.imageUrl && (
         <Link href={`/posts/${post.id}`} passHref legacyBehavior>
           <a className="block relative w-full h-48 overflow-hidden cursor-pointer">
@@ -211,11 +206,10 @@ function PostCard({ post }: { post: Post }) {
             </div>
         )}
       </CardContent>
-      
+
       <CardFooter className="flex flex-col items-start gap-3 border-t pt-4">
         <div className="flex justify-between w-full items-center">
             <div className="flex items-center gap-4 text-muted-foreground">
-                {/* Like button on card is display-only for count */}
                 <Button variant="ghost" size="sm" className="p-1 h-auto cursor-default hover:bg-transparent hover:text-muted-foreground">
                     <Icons.thumbsUp className="mr-1.5 h-4 w-4" /> {post.likesCount || 0}
                 </Button>
@@ -293,3 +287,4 @@ const PostCardSkeleton = () => (
     </CardFooter>
   </Card>
 );
+

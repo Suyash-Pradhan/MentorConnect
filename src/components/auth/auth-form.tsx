@@ -82,14 +82,13 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
 
-        // For new sign-ups, create a basic profile shell.
         const newProfile: Profile = {
           id: firebaseUser.uid,
           email: firebaseUser.email || data.email,
           role: null,
           name: firebaseUser.displayName || "", 
           avatarUrl: firebaseUser.photoURL || "",
-          createdAt: new Date(), // This will be converted to Timestamp by setProfile
+          createdAt: new Date(),
         };
         await setProfile(firebaseUser.uid, newProfile);
 
@@ -97,7 +96,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
           title: "Account Created!",
           description: "You have successfully signed up. Please select your role.",
         });
-        router.push("/role-selection"); // Redirect to role selection after signup
+        router.push("/role-selection");
       } else { // Login
         await signInWithEmailAndPassword(auth, data.email, data.password);
         // On successful Firebase login, redirect to dashboard.
@@ -354,4 +353,3 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
     </>
   );
 }
-

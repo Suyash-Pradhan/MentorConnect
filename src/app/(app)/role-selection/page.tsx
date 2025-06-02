@@ -10,39 +10,26 @@ import { useToast } from "@/hooks/use-toast";
 import type { Role, Profile, StudentProfile, AlumniProfile } from "@/types";
 import { getProfile, setProfile, initializeRoleProfile } from "@/services/profileService";
 import { auth } from "@/lib/firebase"; // Import Firebase auth instance
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
+// Removed: onAuthStateChanged, type User as FirebaseUser - AppLayout handles auth state
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function RoleSelectionPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  const [selectedRoleForUI, setSelectedRoleForUI] = React.useState<Role | null>(null); // For UI feedback during async op
+  const [selectedRoleForUI, setSelectedRoleForUI] = React.useState<Role | null>(null);
 
-  const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setFirebaseUser(user);
-      } else {
-        setFirebaseUser(null);
-        toast({ variant: "destructive", title: "Not Authenticated", description: "Please log in to select a role." });
-        router.push("/login"); // Redirect if not authenticated
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router, toast]);
+  // AppLayout ensures that this page is only rendered for authenticated users.
+  // We can directly use auth.currentUser.
 
   const handleRoleSelection = async (role: 'student' | 'alumni') => {
-    if (isLoading) return; // Prevent multiple submissions
-    
+    if (isLoading) return;
+
+    const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
       toast({ variant: "destructive", title: "Authentication Error", description: "No authenticated user found. Please try logging in again." });
-      setIsLoading(false);
-      router.push("/login");
+      // AppLayout should handle redirecting to login if auth state is lost.
+      router.push("/login"); // Fallback redirect
       return;
     }
 
@@ -51,42 +38,38 @@ export default function RoleSelectionPage() {
 
     try {
       const userId = firebaseUser.uid;
-      const userEmail = firebaseUser.email || "unknown@example.com"; // Fallback
+      const userEmail = firebaseUser.email || "unknown@example.com";
 
       let userProfile = await getProfile(userId);
 
       if (!userProfile) {
-        // This case should ideally be handled by signup creating a profile
-        // But as a fallback, create one now.
         userProfile = {
           id: userId,
           email: userEmail,
-          role: role, // Set the role directly
-          createdAt: new Date(), 
+          role: role,
+          createdAt: new Date(),
           name: firebaseUser.displayName || "",
           avatarUrl: firebaseUser.photoURL || "",
         };
       } else {
-        // Profile exists, just update the role
         userProfile.role = role;
       }
 
-      // Initialize role-specific profile
       if (role === 'student') {
         userProfile.studentProfile = userProfile.studentProfile || await initializeRoleProfile('student') as StudentProfile;
-        userProfile.alumniProfile = undefined; // Clear other role profile
-      } else { // alumni
+        userProfile.alumniProfile = undefined;
+      } else {
         userProfile.alumniProfile = userProfile.alumniProfile || await initializeRoleProfile('alumni') as AlumniProfile;
-        userProfile.studentProfile = undefined; // Clear other role profile
+        userProfile.studentProfile = undefined;
       }
       
       await setProfile(userId, userProfile);
 
       toast({
         title: "Role Selected!",
-        description: `You are now registered as a ${role}. Redirecting to your profile...`,
+        description: `You are now registered as a ${role}. Redirecting to complete your profile...`,
       });
-      router.push("/profile"); // Redirect to profile page to complete info
+      router.push("/profile?edit=true&from=role_selection"); // Redirect to profile page to complete info
 
     } catch (error) {
       console.error("Error saving role:", error);
@@ -101,31 +84,33 @@ export default function RoleSelectionPage() {
     }
   };
 
-  if (authLoading) {
+  // Show loading skeleton or a message if auth.currentUser is somehow not available yet,
+  // though AppLayout should prevent this page from rendering in such a state.
+  if (!auth.currentUser && !isLoading) {
     return (
-      <div className="flex items-center justify-center w-full py-12">
-        <Card className="w-full max-w-lg shadow-xl">
-          <CardHeader className="text-center space-y-4">
-            <Skeleton className="mx-auto h-16 w-16 rounded-full" />
-            <Skeleton className="h-8 w-3/4 mx-auto" />
-            <Skeleton className="h-6 w-1/2 mx-auto" />
-          </CardHeader>
-          <CardContent className="space-y-6 p-8">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </CardContent>
-          <CardFooter className="p-6"><Skeleton className="h-4 w-full" /></CardFooter>
-        </Card>
-      </div>
+         <div className="flex items-center justify-center w-full py-12">
+            <Card className="w-full max-w-lg shadow-xl">
+                <CardHeader className="text-center space-y-4">
+                    <Skeleton className="mx-auto h-16 w-16 rounded-full" />
+                    <Skeleton className="h-8 w-3/4 mx-auto" />
+                    <Skeleton className="h-6 w-1/2 mx-auto" />
+                </CardHeader>
+                <CardContent className="p-8 text-center">
+                    <p className="text-muted-foreground">Loading user information...</p>
+                    <Button onClick={() => router.push('/login')} className="mt-4">Go to Login</Button>
+                </CardContent>
+            </Card>
+        </div>
     );
   }
+
 
   return (
     <div className="flex items-center justify-center w-full py-12"> 
       <Card className="w-full max-w-lg shadow-xl bg-card text-card-foreground">
         <CardHeader className="text-center">
           <Icons.logo className="mx-auto h-16 w-16 text-primary mb-4" />
-          <CardTitle className="text-3xl">Welcome to MentorConnect!</CardTitle>
+          <CardTitle className="text-3xl">Confirm Your Role</CardTitle>
           <CardDescription className="text-lg text-muted-foreground">
             Please select your role to continue. This will help us tailor your experience.
           </CardDescription>
@@ -140,7 +125,7 @@ export default function RoleSelectionPage() {
             {isLoading && selectedRoleForUI === "student" ? (
               <Icons.spinner className="mr-2 h-5 w-5 animate-spin" />
             ) : (
-              <Icons.profile className="mr-3 h-6 w-6" /> // Changed icon to be more generic
+              <Icons.profile className="mr-3 h-6 w-6" />
             )}
             I am a Student
           </Button>
@@ -154,7 +139,7 @@ export default function RoleSelectionPage() {
             {isLoading && selectedRoleForUI === "alumni" ? (
               <Icons.spinner className="mr-2 h-5 w-5 animate-spin" />
             ) : (
-              <Icons.myOpportunities className="mr-3 h-6 w-6" /> // Kept Briefcase for Alumni
+              <Icons.myOpportunities className="mr-3 h-6 w-6" />
             )}
             I am an Alumni
           </Button>

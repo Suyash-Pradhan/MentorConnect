@@ -39,8 +39,8 @@ const nextConfig: NextConfig = {
       // Standard fallbacks
       config.resolve.fallback.async_hooks = false;
       config.resolve.fallback['node:async_hooks'] = false;
-      config.resolve.fallback.fs = false; // Added for fs
-      config.resolve.fallback['node:fs'] = false; // Added for node:fs
+      config.resolve.fallback.fs = false; 
+      config.resolve.fallback['node:fs'] = false; 
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
       config.resolve.fallback.http2 = false;
@@ -50,6 +50,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:perf_hooks'] = false;
       config.resolve.fallback.buffer = false;
       config.resolve.fallback['node:buffer'] = false;
+      config.resolve.fallback.https = false; // Added for https
+      config.resolve.fallback['node:https'] = false; // Added for node:https
 
 
       // Add IgnorePlugin for node: prefixed modules and non-prefixed ones
@@ -85,14 +87,24 @@ const nextConfig: NextConfig = {
             resourceRegExp: /^buffer$/,
           })
         );
-        config.plugins.push( // Added for fs
+        config.plugins.push( 
           new webpack.IgnorePlugin({
             resourceRegExp: /^node:fs$/,
           })
         );
-        config.plugins.push( // Added for fs
+        config.plugins.push( 
           new webpack.IgnorePlugin({
             resourceRegExp: /^fs$/,
+          })
+        );
+        config.plugins.push( // Added for https
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:https$/,
+          })
+        );
+        config.plugins.push( // Added for https
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^https$/,
           })
         );
       }

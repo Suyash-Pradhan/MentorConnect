@@ -95,7 +95,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
       <CardFooter className="p-4 border-t flex flex-col sm:flex-row gap-2">
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto flex-1">
+            <Button variant="outline" className="w-full sm:w-auto"> {/* Removed flex-1 */}
               <Icons.profile className="mr-2 h-4 w-4" /> View Full Profile
             </Button>
           </DialogTrigger>
@@ -121,7 +121,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
         {currentUserProfile?.role === 'student' && (
           <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto flex-1">
+              <Button className="w-full sm:w-auto"> {/* Removed flex-1 */}
                 <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
               </Button>
             </DialogTrigger>

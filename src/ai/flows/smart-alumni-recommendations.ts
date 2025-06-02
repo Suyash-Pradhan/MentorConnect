@@ -1,4 +1,5 @@
-// use server'
+
+'use server';
 
 /**
  * @fileOverview AI flow to provide smart alumni recommendations to students based on their interests.

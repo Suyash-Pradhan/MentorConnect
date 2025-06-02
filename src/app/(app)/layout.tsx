@@ -1,9 +1,8 @@
 
-"use client"; // Make it a client component
+"use client"; 
 
 import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -112,72 +111,77 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true); 
   const [profileError, setProfileError] = useState<any>(null);
 
-  // Effect for Firebase auth subscription
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-      setAuthLoading(false); // Auth state is now determined
+      setAuthLoading(false);
     });
     return () => unsubscribe();
-  }, []); // Runs once on mount to set up listener
+  }, []);
 
-  // Effect for fetching profile WHEN firebaseUser changes
   useEffect(() => {
-    if (firebaseUser) {
-      setProfileLoading(true);
-      setProfileError(null);
-      getProfile(firebaseUser.uid)
-        .then(profile => {
-          setUserProfile(profile);
-        })
-        .catch(e => {
-          console.error("[AppLayout] Error fetching profile:", e);
-          setProfileError(e);
-          setUserProfile(null);
-        })
-        .finally(() => {
-          setProfileLoading(false);
-        });
-    } else {
-      setUserProfile(null); // Clear profile if firebaseUser becomes null
-      setProfileLoading(false); // No profile to load
+    if (!firebaseUser) {
+      setUserProfile(null);
+      setProfileLoading(false); // No profile to load if no firebaseUser
+      return;
     }
-  }, [firebaseUser]); // Runs when firebaseUser changes
+    // Firebase user exists, proceed to fetch profile
+    setProfileLoading(true);
+    setProfileError(null);
+    getProfile(firebaseUser.uid)
+      .then(profile => { 
+        setUserProfile(profile); 
+      })
+      .catch(e => {
+        console.error("[AppLayout] Critical error fetching profile for authenticated user:", e);
+        setProfileError(e); // This will be caught by the render logic
+        setUserProfile(null);
+      })
+      .finally(() => { 
+        setProfileLoading(false); 
+      });
+  }, [firebaseUser]);
 
-  // Effect for redirecting if NOT authenticated
   useEffect(() => {
     if (!authLoading && !firebaseUser) {
-      // If auth check is complete and there's no user,
-      // and we are not on a public/auth page, redirect to login.
-      const publicPaths = ['/login', '/signup', '/']; // Add any other public paths
+      const publicPaths = ['/login', '/signup', '/']; 
       if (!publicPaths.includes(pathname)) {
         router.push('/login');
       }
     }
   }, [authLoading, firebaseUser, pathname, router]);
 
+  // --- Render Logic ---
 
   if (authLoading) {
+    // Still waiting for Firebase to determine initial auth state
     return <FullPageSkeleton />;
   }
 
-  // If auth check is complete, but no user, and we're on a protected route,
-  // the redirect effect will handle it. We can return a skeleton or null here
-  // to prevent rendering children prematurely.
-  const publicPaths = ['/login', '/signup', '/'];
-  if (!firebaseUser && !publicPaths.includes(pathname)) {
-    return <FullPageSkeleton />; // Or null; redirect is in progress or will occur
+  if (!firebaseUser) {
+    // Auth check complete, no Firebase user.
+    // If on a protected route, the useEffect above should be redirecting to /login.
+    // Render skeleton to avoid flashing content before redirect completes.
+    const publicPaths = ['/login', '/signup', '/'];
+    if (!publicPaths.includes(pathname)) {
+        return <FullPageSkeleton />; 
+    }
+    // If on a public path that incorrectly uses this layout (should not happen for (app) group),
+    // or if somehow redirect hasn't fired, this is a fallback.
+    // For /login, /signup, / this layout isn't used. For (app)/*, this means redirect is happening.
+    return <FullPageSkeleton />; // Or specific "Redirecting..." component
   }
 
-  // If user is authenticated, but profile is still loading
-  if (firebaseUser && profileLoading) {
+  // FirebaseUser exists. Now check profile fetching state.
+  if (profileLoading) {
+    // Authenticated, but Firestore profile is still loading.
     return (
       <SidebarProvider>
         <div className="flex min-h-screen flex-col w-full">
-          <AppHeader userProfile={null} /> {/* Pass null or partial profile if needed */}
+          <AppHeader userProfile={null} /> {/* Pass null, as full profile isn't ready */}
           <div className="flex flex-1 w-full">
             <AppSidebar userProfile={null} />
             <SidebarInset className="p-4 md:p-6 lg:p-8">
@@ -191,15 +195,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     );
   }
   
-  // Handle profile error for an authenticated user
-  if (firebaseUser && profileError) {
+  if (profileError) {
+    // Authenticated, but there was an error fetching Firestore profile.
      return (
         <SidebarProvider>
             <div className="flex min-h-screen flex-col w-full">
-                <AppHeader userProfile={null} />
+                <AppHeader userProfile={null} /> {/* Error state, profile might be incomplete */}
                 <div className="flex flex-1 w-full">
                     <AppSidebar userProfile={null} />
-                    <SidebarInset className="p-0"> {/* Remove padding for full-page error */}
+                    <SidebarInset className="p-0"> 
                          <FirestoreErrorDisplay error={profileError} />
                     </SidebarInset>
                 </div>
@@ -208,7 +212,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
      );
   }
 
-  // If authenticated and profile loaded (or no profile needed for a route that still uses AppLayout)
+  // If we reach here: 
+  // - authLoading is false (Firebase auth state known)
+  // - firebaseUser exists (user is authenticated with Firebase)
+  // - profileLoading is false (Firestore profile fetch attempt complete)
+  // - profileError is null (Firestore profile fetch was successful, or no error was thrown)
+  // userProfile might be null if the document doesn't exist (e.g., new user)
+  // OR userProfile might be populated.
+  // The children (e.g., DashboardPage) will handle the case where userProfile is null (new user)
+  // by redirecting to /role-selection or /profile for completion.
   return (
     <SidebarProvider>
       <div className="flex min-h-screen flex-col w-full">

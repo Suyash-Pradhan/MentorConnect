@@ -4,7 +4,7 @@
 import * as React from "react";
 import { MentorshipRequestCard } from "@/components/mentorship/mentorship-request-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { MentorshipRequest, Role } from "@/types"; // Profile type removed as it comes from context
+import type { MentorshipRequest, Role } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
@@ -13,32 +13,27 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getMentorshipRequestsForUser, updateMentorshipRequestStatus } from "@/services/mentorshipService";
-// getProfile removed, auth removed
-import { useUserProfile } from "@/contexts/user-profile-context"; // Import the context hook
+import { useUserProfile } from "@/contexts/user-profile-context"; 
 
 export default function MentorshipPage() {
   const { toast } = useToast();
-  const { userProfile, profileLoading, profileError } = useUserProfile(); // Use context
+  const { userProfile, profileLoading, profileError } = useUserProfile(); 
 
   const [requests, setRequests] = React.useState<MentorshipRequest[]>([]);
-  const [isLoadingRequests, setIsLoadingRequests] = React.useState(true); // Specific loading for requests
+  const [isLoadingRequests, setIsLoadingRequests] = React.useState(true);
 
   React.useEffect(() => {
-    if (profileLoading) return; // Wait for profile to be loaded or failed
+    if (profileLoading) return; 
 
     if (!userProfile || !userProfile.role) {
-      // If profile is loaded but no role, this implies an issue handled by profile page or role selection.
-      // Mentorship page shouldn't function without a role.
       setIsLoadingRequests(false);
-      setRequests([]); // Clear requests if profile/role is missing
-      // The UI will show the "role not set" message based on userProfile.role below
+      setRequests([]); 
       return;
     }
 
     const fetchMentorshipData = async () => {
       setIsLoadingRequests(true);
       try {
-        // userProfile and userProfile.role are guaranteed here by the checks above
         const fetchedRequests = await getMentorshipRequestsForUser(userProfile.id, userProfile.role);
         setRequests(fetchedRequests);
       } catch (error) {
@@ -51,14 +46,14 @@ export default function MentorshipPage() {
     };
 
     fetchMentorshipData();
-  }, [userProfile, profileLoading]); // Depend on userProfile and profileLoading from context, removed toast
+  }, [userProfile, profileLoading, toast]);
 
   const handleUpdateRequestStatus = async (requestId: string, newStatus: 'accepted' | 'rejected' | 'messaged', message?: string) => {
     try {
       await updateMentorshipRequestStatus(requestId, newStatus, message);
       setRequests(prevRequests =>
         prevRequests.map(req =>
-          req.id === requestId ? { ...req, status: newStatus, respondedAt: new Date(), alumniMessage: newStatus === 'messaged' ? message : req.alumniMessage } : req
+          req.id === requestId ? { ...req, status: newStatus, respondedAt: new Date(), alumniMessage: newStatus === 'messaged' ? message : req.alumniMessage, chatId: newStatus === 'accepted' ? message : req.chatId } : req
         )
       );
       toast({ title: `Request ${newStatus}`, description: `Mentorship request has been ${newStatus}.`});
@@ -69,18 +64,21 @@ export default function MentorshipPage() {
   };
 
   const categorizeRequests = (role: Role | null) => {
-    if (!role || !userProfile) return { sent: [], received: [], accepted: [] };
+    if (!role || !userProfile) return { sent: [], received: [], accepted: [], active: [] }; // Added active for student
+    
     if (role === 'student') {
       return {
-        sent: requests.filter(req => req.studentId === userProfile.id),
-        received: [],
-        accepted: [], 
+        sent: requests.filter(req => req.studentId === userProfile.id && (req.status === 'pending' || req.status === 'messaged' || req.status === 'rejected')),
+        received: [], // Students don't "receive" requests in this model
+        accepted: requests.filter(req => req.studentId === userProfile.id && req.status === 'accepted'), // This will populate "Active Mentorships"
+        active: requests.filter(req => req.studentId === userProfile.id && req.status === 'accepted'), // Alias for clarity if needed elsewhere
       };
     } else { // alumni
       return {
         received: requests.filter(req => req.alumniId === userProfile.id && req.status === 'pending'),
         accepted: requests.filter(req => req.alumniId === userProfile.id && req.status === 'accepted'),
-        sent: [],
+        sent: [], // Alumni don't send requests
+        active: requests.filter(req => req.alumniId === userProfile.id && req.status === 'accepted'), // Their accepted requests are their active ones
       };
     }
   };
@@ -88,7 +86,7 @@ export default function MentorshipPage() {
   const categorized = categorizeRequests(userProfile?.role || null);
   
   const renderRequestList = (reqList: MentorshipRequest[], emptyMessage: string) => {
-    if (isLoadingRequests) { // Use specific loading state for requests
+    if (isLoadingRequests) { 
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
           {Array.from({length: 2}).map((_, i) => <RequestCardSkeleton key={i} />)}
@@ -109,7 +107,7 @@ export default function MentorshipPage() {
           <MentorshipRequestCard
             key={request.id}
             request={request}
-            currentUserRole={userProfile?.role || 'student'}
+            currentUserRole={userProfile?.role || 'student'} // Default to student if role somehow null, though outer checks should prevent
             onUpdateRequestStatus={handleUpdateRequestStatus}
           />
         ))}
@@ -117,7 +115,7 @@ export default function MentorshipPage() {
     );
   };
 
-  if (profileLoading) { // Show skeleton if profile is loading (from context)
+  if (profileLoading) { 
      return (
       <div className="w-full">
         <Skeleton className="h-10 w-3/4 mb-2" />
@@ -129,7 +127,7 @@ export default function MentorshipPage() {
      );
   }
 
-  if (profileError) { // Handle profile loading error from context
+  if (profileError) { 
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="h-16 w-16 text-destructive mx-auto mb-4" />
@@ -139,7 +137,7 @@ export default function MentorshipPage() {
     );
   }
 
-  if (!userProfile?.role) { // Role not set (profile loaded but no role)
+  if (!userProfile?.role) { 
     return (
       <div className="w-full text-center py-10">
         <Icons.warning className="mx-auto h-16 w-16 text-destructive mb-4" />
@@ -149,14 +147,13 @@ export default function MentorshipPage() {
     );
   }
 
-  // At this point, userProfile and userProfile.role are available.
   return (
     <div className="w-full">
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-foreground">Mentorship Dashboard</h1>
         <p className="text-lg text-muted-foreground">
           {userProfile.role === 'student'
-            ? "Manage your mentorship requests sent to alumni."
+            ? "Manage your mentorship requests and active connections."
             : "Manage mentorship requests received from students."}
         </p>
       </div>
@@ -168,13 +165,16 @@ export default function MentorshipPage() {
                 Sent Requests 
                 {!isLoadingRequests && categorized.sent && <Badge variant="secondary" className="ml-2">{categorized.sent.length}</Badge>}
             </TabsTrigger>
-             <TabsTrigger value="active" disabled>Active Mentorships</TabsTrigger>
+             <TabsTrigger value="active"> {/* Changed from value="accepted" */}
+                Active Mentorships
+                {!isLoadingRequests && categorized.accepted && <Badge variant="secondary" className="ml-2">{categorized.accepted.length}</Badge>}
+             </TabsTrigger>
           </TabsList>
           <TabsContent value="sent">
-            {renderRequestList(categorized.sent || [], "You haven't sent any mentorship requests yet.")}
+            {renderRequestList(categorized.sent || [], "You haven't sent any mentorship requests, or they have been accepted or archived.")}
           </TabsContent>
-           <TabsContent value="active">
-             {renderRequestList([], "You have no active mentorships.")}
+           <TabsContent value="active"> {/* Changed from value="accepted" */}
+             {renderRequestList(categorized.accepted || [], "You have no active mentorships.")}
            </TabsContent>
         </Tabs>
       )}
@@ -229,3 +229,5 @@ const RequestCardSkeleton = () => (
   </Card>
 );
 
+
+    

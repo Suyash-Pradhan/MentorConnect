@@ -60,9 +60,23 @@ const answerFAQFlow = ai.defineFlow(
     inputSchema: AnswerFAQInputSchema,
     outputSchema: AnswerFAQOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input): Promise<AnswerFAQOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        console.error('answerFAQFlow: AI model did not return an output.');
+        return { answer: "I'm sorry, I couldn't come up with a response. Please try rephrasing your question." };
+      }
+      return output;
+    } catch (error: any) {
+      console.error('Error executing answerFAQPrompt in flow:', error);
+      let userMessage = "I'm currently having trouble connecting to the AI service. Please try again in a few moments.";
+      if (error.message && error.message.includes('Service Unavailable') || error.message.includes('overloaded')) {
+        userMessage = "The AI service is currently experiencing high demand. Please try your question again in a little while.";
+      } else if (error.message && error.message.includes('API key not valid')) {
+        userMessage = "There seems to be an issue with the AI service configuration. Please notify support.";
+      }
+      return { answer: userMessage };
+    }
   }
 );
-

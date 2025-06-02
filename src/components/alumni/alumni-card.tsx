@@ -24,7 +24,7 @@ import { ViewProfile } from "../profile/view-profile";
 
 interface AlumniCardProps {
   alumni: Profile; 
-  currentUserProfile?: Profile | null; // Changed from currentUserRole
+  currentUserProfile?: Profile | null; 
   onMentorshipRequest: (message: string) => void; 
 }
 
@@ -92,10 +92,10 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
           </div>
         )}
       </CardContent>
-      <CardFooter className="p-4 border-t flex flex-col sm:flex-row sm:flex-wrap gap-2">
+      <CardFooter className="p-4 border-t flex flex-col sm:flex-row gap-2">
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:flex-1">
               <Icons.profile className="mr-2 h-4 w-4" /> View Full Profile
             </Button>
           </DialogTrigger>
@@ -119,7 +119,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
         {currentUserProfile?.role === 'student' && (
           <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
+              <Button className="w-full sm:flex-1">
                 <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
               </Button>
             </DialogTrigger>

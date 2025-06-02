@@ -18,10 +18,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { getDiscussionThreadById, getCommentsForThread, addCommentToThread } from "@/services/discussionService";
-import { getProfile } from "@/services/profileService";
-
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+import { useUserProfile } from "@/contexts/user-profile-context";
 
 const commentSchema = z.object({
   content: z.string().min(1, "Comment cannot be empty.").max(1000, "Comment is too long."),
@@ -36,8 +33,9 @@ export default function SingleDiscussionPage() {
 
   const [thread, setThread] = React.useState<DiscussionThread | null | undefined>(undefined);
   const [comments, setComments] = React.useState<ThreadCommentType[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true); // For thread/comments data
+  
+  const { userProfile, profileLoading, profileError } = useUserProfile(); // Use context for user info
 
   const form = useForm<CommentFormValues>({
     resolver: zodResolver(commentSchema),
@@ -53,14 +51,13 @@ export default function SingleDiscussionPage() {
       }
       setIsLoading(true);
       try {
-        const [fetchedThread, fetchedComments, userProfile] = await Promise.all([
+        // User profile now comes from context, so no need to fetch it here for comment form
+        const [fetchedThread, fetchedComments] = await Promise.all([
           getDiscussionThreadById(threadId),
           getCommentsForThread(threadId),
-          getProfile(MOCK_CURRENT_USER_ID) // Fetch current user for posting comments
         ]);
         setThread(fetchedThread);
         setComments(fetchedComments);
-        setCurrentUserProfile(userProfile);
       } catch (error) {
         console.error("Error fetching discussion details:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load discussion." });
@@ -73,18 +70,18 @@ export default function SingleDiscussionPage() {
   }, [threadId, toast]);
 
   const handleAddComment = async (values: CommentFormValues) => {
-    if (!currentUserProfile || !thread) {
-      toast({ variant: "destructive", title: "Error", description: "You must be logged in to comment or thread is missing." });
+    if (!userProfile || !userProfile.role || !thread) { // Check role from context's userProfile
+      toast({ variant: "destructive", title: "Error", description: "You must be logged in with a valid role to comment or thread is missing." });
       return;
     }
     
     try {
       const newCommentData: Omit<ThreadCommentType, 'id' | 'createdAt'> = {
         threadId: thread.id,
-        authorId: currentUserProfile.id,
-        authorName: currentUserProfile.name || "Anonymous",
-        authorAvatar: currentUserProfile.avatarUrl,
-        authorRole: currentUserProfile.role || 'student', // Default to student if role is somehow null
+        authorId: userProfile.id,
+        authorName: userProfile.name || "Anonymous",
+        authorAvatar: userProfile.avatarUrl,
+        authorRole: userProfile.role,
         content: values.content,
       };
       const newCommentId = await addCommentToThread(thread.id, newCommentData);
@@ -94,8 +91,6 @@ export default function SingleDiscussionPage() {
         createdAt: new Date(),
       };
       setComments(prev => [displayNewComment, ...prev]);
-      // Update thread's lastActivityAt and commentsCount locally for immediate feedback if needed,
-      // or re-fetch thread. For simplicity, we are not re-fetching here.
       if(thread) {
         setThread(prev => prev ? {...prev, lastActivityAt: new Date(), commentsCount: (prev.commentsCount || 0) + 1} : null )
       }
@@ -107,7 +102,7 @@ export default function SingleDiscussionPage() {
     }
   };
 
-  if (isLoading || thread === undefined) {
+  if (isLoading || thread === undefined) { // This isLoading is for thread content
     return <DiscussionPageSkeleton />;
   }
 
@@ -160,12 +155,14 @@ export default function SingleDiscussionPage() {
           <CardTitle className="text-xl">Comments ({comments.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentUserProfile && (
+          {profileLoading ? (
+            <div className="p-4 border rounded-lg bg-secondary/50 text-center text-muted-foreground">Loading user details for commenting...</div>
+          ) : userProfile && userProfile.role ? (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleAddComment)} className="flex items-start gap-3 p-4 border rounded-lg bg-secondary/50">
                 <Avatar className="h-10 w-10 mt-1">
-                  <AvatarImage src={currentUserProfile.avatarUrl || `https://placehold.co/40x40.png`} alt={currentUserProfile.name || "User"} data-ai-hint="person"/>
-                  <AvatarFallback>{currentUserProfile.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                  <AvatarImage src={userProfile.avatarUrl || `https://placehold.co/40x40.png`} alt={userProfile.name || "User"} data-ai-hint="person"/>
+                  <AvatarFallback>{userProfile.name?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
                    <FormField
@@ -194,8 +191,11 @@ export default function SingleDiscussionPage() {
                 </div>
               </form>
             </Form>
-          )}
-          {!currentUserProfile && (
+          ) : userProfile && !userProfile.role ? (
+            <p className="text-muted-foreground text-center p-4 border rounded-md">
+                Please <Link href="/profile?edit=true&from=discussion_comment" className="text-primary hover:underline font-semibold">complete your profile by selecting a role</Link> to post a comment.
+            </p>
+          ) : (
             <p className="text-muted-foreground text-center p-4 border rounded-md">
                 <Link href="/login" className="text-primary hover:underline font-semibold">Log in</Link> or <Link href="/signup" className="text-primary hover:underline font-semibold">sign up</Link> to post a comment.
             </p>
@@ -288,3 +288,6 @@ const DiscussionPageSkeleton = () => (
     </Card>
   </div>
 );
+
+
+    

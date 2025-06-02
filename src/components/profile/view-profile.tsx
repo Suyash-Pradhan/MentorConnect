@@ -92,7 +92,7 @@ export function ViewProfile({ profile, currentUserProfile, onMentorshipRequest }
     <Card className="w-full shadow-lg overflow-hidden">
       <div className="relative h-48 bg-gradient-to-r from-primary to-accent">
          <Image 
-            src={profile.avatarUrl || `https://placehold.co/800x400.png`} 
+            src="https://placehold.co/800x400.png"
             alt={`${profile.name || 'User'}'s cover photo`}
             layout="fill"
             objectFit="cover"

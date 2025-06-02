@@ -32,29 +32,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     let errorTitle = "Application Error";
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
     let troubleshootingSteps: React.ReactNode[] = [];
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID_HERE";
-    const firestoreApiLink = `https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projectId}`;
-    const firebaseConsoleLink = `https://console.firebase.google.com/project/${projectId}/firestore`;
+    
+    const displayProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "[Project ID not found]";
+    const firestoreApiLink = `https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${displayProjectId}`;
+    const firebaseConsoleLink = `https://console.firebase.google.com/project/${displayProjectId}/firestore`;
 
     if (firebaseError.code === 'permission-denied' || (firebaseError.message && firebaseError.message.includes('PERMISSION_DENIED'))) {
       errorTitle = "Firestore Permission Denied";
-      errorMessage = `The application cannot access Cloud Firestore for project "${projectId}". This usually means the Cloud Firestore API has not been enabled for this project, or it's still propagating.`;
+      errorMessage = `The application cannot access Cloud Firestore for project "${displayProjectId}". This usually means the Cloud Firestore API has not been enabled for this project, or it's still propagating.`;
       troubleshootingSteps = [
-        <li key="step1"><strong>Verify Google Account:</strong> Ensure you are logged into the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Google Cloud Console</a> and <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Firebase Console</a> with the Google account that **owns or has Editor permissions** for the Firebase project <strong><code>{projectId}</code></strong>.</li>,
+        <li key="step1"><strong>Verify Google Account:</strong> Ensure you are logged into the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Google Cloud Console</a> and <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Firebase Console</a> with the Google account that **owns or has Editor permissions** for the Firebase project <strong><code>{displayProjectId}</code></strong>.</li>,
         <li key="step2"><strong>Enable Firestore API:</strong> Go to <a href={firestoreApiLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Cloud Firestore API Page</a>. If it's not enabled, click "Enable".</li>,
-        <li key="step3"><strong>Create Firestore Database:</strong> In the <a href={firebaseConsoleLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Firebase Console for <code>{projectId}</code></a>, go to "Firestore Database" (under Build). If no database exists, click "Create database" (choose a region and start in test mode for development).</li>,
+        <li key="step3"><strong>Create Firestore Database:</strong> In the <a href={firebaseConsoleLink} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">Firebase Console for <code>{displayProjectId}</code></a>, go to "Firestore Database" (under Build). If no database exists, click "Create database" (choose a region and start in test mode for development).</li>,
         <li key="step4"><strong>Wait for Propagation:</strong> After enabling the API or creating the database, wait 10-20 minutes for changes to propagate.</li>,
         <li key="step5"><strong>Restart Server:</strong> Stop and restart your Next.js development server.</li>,
-        <li key="step6"><strong>Check Project ID:</strong> Ensure <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code> in your <code>.env.local</code> file exactly matches <strong><code>{projectId}</code></strong>.</li>
+        <li key="step6"><strong>Check Project ID:</strong> Ensure <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code> in your <code>.env.local</code> file exactly matches <strong><code>{displayProjectId}</code></strong>.</li>
       ];
     } else if (firebaseError.code === 'unavailable' || (firebaseError.message && firebaseError.message.includes('client is offline'))) {
       errorTitle = "Firestore Client Offline";
-      errorMessage = `The application could not connect to Cloud Firestore for project "${projectId}". This might be due to recent API enablement, a network issue, or the Firestore database instance not being fully ready.`;
+      errorMessage = `The application could not connect to Cloud Firestore for project "${displayProjectId}". This might be due to recent API enablement, a network issue, or the Firestore database instance not being fully ready.`;
        troubleshootingSteps = [
         <li key="step1"><strong>If Firestore API was just enabled/Database created:</strong> Please wait 10-20 minutes for the changes to propagate across Google's systems.</li>,
         <li key="step2"><strong>Restart Server:</strong> Stop and restart your Next.js development server.</li>,
         <li key="step3"><strong>Check Network:</strong> Ensure your server has a stable internet connection.</li>,
-        <li key="step4"><strong>Verify Setup:</strong> Double-check that the Cloud Firestore API is enabled and a Firestore Database instance exists for project <strong><code>{projectId}</code></strong> using the links above.</li>
+        <li key="step4"><strong>Verify Setup:</strong> Double-check that the Cloud Firestore API is enabled and a Firestore Database instance exists for project <strong><code>{displayProjectId}</code></strong> using the links above.</li>
       ];
     }
 

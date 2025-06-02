@@ -48,9 +48,7 @@ const nextConfig: NextConfig = {
       config.resolve.fallback.perf_hooks = false;
       config.resolve.fallback['node:perf_hooks'] = false;
 
-      // Add IgnorePlugin for node: prefixed modules as a stronger measure
-      // This is used when fallbacks don't suffice or to prevent
-      // even attempting to resolve/bundle these.
+      // Add IgnorePlugin for node: prefixed modules and non-prefixed ones as a stronger measure
       if (webpack && webpack.IgnorePlugin) { // Check if webpack and IgnorePlugin are available
         config.plugins = config.plugins || []; // Ensure plugins array exists
         config.plugins.push(
@@ -60,7 +58,17 @@ const nextConfig: NextConfig = {
         );
         config.plugins.push(
           new webpack.IgnorePlugin({
+            resourceRegExp: /^async_hooks$/, // For non-prefixed
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({
             resourceRegExp: /^node:perf_hooks$/,
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^perf_hooks$/, // For non-prefixed
           })
         );
       }

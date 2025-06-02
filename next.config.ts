@@ -61,6 +61,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:process'] = false; 
       config.resolve.fallback['stream/web'] = false;
       config.resolve.fallback['node:stream/web'] = false;
+      config.resolve.fallback.stream = false; // Added for 'stream'
+      config.resolve.fallback['node:stream'] = false; // Added for 'node:stream'
 
 
       // Add IgnorePlugin for node: prefixed modules ONLY
@@ -102,11 +104,6 @@ const nextConfig: NextConfig = {
           })
         );
         config.plugins.push(
-          new webpack.IgnorePlugin({
-            resourceRegExp: /^node:path$/,
-          })
-        );
-        config.plugins.push(
           new webpack.IgnorePlugin({ 
             resourceRegExp: /^node:process$/,
           })
@@ -114,6 +111,11 @@ const nextConfig: NextConfig = {
         config.plugins.push(
           new webpack.IgnorePlugin({
             resourceRegExp: /^node:stream\/web$/,
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({ // Added for 'node:stream'
+            resourceRegExp: /^node:stream$/,
           })
         );
       }

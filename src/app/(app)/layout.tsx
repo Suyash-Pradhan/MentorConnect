@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     let errorMessage = "An unexpected error occurred while trying to load your profile.";
     let troubleshootingSteps: React.ReactNode[] = [];
     
-    const displayProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "[Project ID not found]";
+    const displayProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "[Project ID Not Found in Env]";
     const firestoreApiLink = `https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${displayProjectId}`;
     const firebaseConsoleLink = `https://console.firebase.google.com/project/${displayProjectId}/firestore`;
 
@@ -57,7 +57,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <li key="step3"><strong>Check Network:</strong> Ensure your server has a stable internet connection.</li>,
         <li key="step4"><strong>Verify Setup:</strong> Double-check that the Cloud Firestore API is enabled and a Firestore Database instance exists for project <strong><code>{displayProjectId}</code></strong> using the links above.</li>
       ];
+    } else if (profileError.message && profileError.message.includes("Firebase Initialization Failed")) {
+      // Handle the specific error thrown by our firebase.ts if env vars are missing
+      errorTitle = "Firebase Configuration Error";
+      errorMessage = "The application could not start due to missing Firebase configuration. Please check the server logs for details and ensure all NEXT_PUBLIC_FIREBASE_ environment variables are set in your .env.local file.";
+      troubleshootingSteps = [
+        <li key="env1">Review your <code>.env.local</code> file at the project root.</li>,
+        <li key="env2">Ensure all variables like <code>NEXT_PUBLIC_FIREBASE_API_KEY</code>, <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code>, etc., are correctly defined.</li>,
+        <li key="env3">Stop and restart your Next.js development server after making changes to <code>.env.local</code>.</li>,
+        <li key="env4">Check the terminal output (server logs) for detailed error messages from the Firebase setup script.</li>
+      ];
     }
+
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-red-50 text-red-800 p-4 md:p-8">

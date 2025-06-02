@@ -7,7 +7,6 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 import { Timestamp, serverTimestamp, type FieldValue } from 'firebase/firestore';
 
-
 // Log the raw values at the very start to see what's available when the module loads
 console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_API_KEY: ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`);
 console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}`);
@@ -17,8 +16,7 @@ console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MESSAGING_SE
 console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_APP_ID: ${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}`);
 console.log(`[FirebaseSetup] Raw Process Env - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}`);
 
-
-const configValues = {
+const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -28,24 +26,18 @@ const configValues = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // This one is optional
 };
 
-const criticalKeysMap: { [key in keyof Omit<typeof configValues, 'measurementId'>]: string } = {
-    apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
-    authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-    projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-    storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-    messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-    appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
-};
-
 const missingCriticalValues: string[] = [];
+const criticalConfigKeys: (keyof Omit<typeof firebaseConfig, 'measurementId'>)[] = [
+  'apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'
+];
 
-for (const key of Object.keys(criticalKeysMap) as (keyof typeof criticalKeysMap)[]) {
-    if (!configValues[key]) { // Check if the value derived directly from process.env.VAR_NAME is falsy
-        missingCriticalValues.push(
-          `${key} (expected from ${criticalKeysMap[key]}, received: ${configValues[key]})`
-        );
-    }
-}
+criticalConfigKeys.forEach(key => {
+  if (!firebaseConfig[key]) {
+    missingCriticalValues.push(
+      `Firebase config key "${key}" is missing or undefined (derived from NEXT_PUBLIC_FIREBASE_${key.replace('Id', '_ID').replace('Url', '_URL').toUpperCase()}). Value: ${firebaseConfig[key]}`
+    );
+  }
+});
 
 if (missingCriticalValues.length > 0) {
     const errorIntro = "[FirebaseSetup] CRITICAL_ERROR: Firebase Initialization Failed. The following required configuration values are missing or undefined:\n";
@@ -54,35 +46,17 @@ if (missingCriticalValues.length > 0) {
     const fullErrorMessage = errorIntro + errorDetails + errorGuidance;
     
     console.error(fullErrorMessage);
-    // Also log the state of process.env again, right before throwing, for direct comparison with initial logs
-    console.error("[FirebaseSetup] process.env state at time of error check:", {
-        NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    });
+    console.error("[FirebaseSetup] Firebase config object at time of error:", firebaseConfig);
     throw new Error(fullErrorMessage);
 }
 
 console.log("[FirebaseSetup] All critical Firebase configuration values appear to be present. Proceeding with initialization.");
 
-// Build the final config using the validated values
-const firebaseConfig = {
-    apiKey: configValues.apiKey!,
-    authDomain: configValues.authDomain!,
-    projectId: configValues.projectId!,
-    storageBucket: configValues.storageBucket!,
-    messagingSenderId: configValues.messagingSenderId!,
-    appId: configValues.appId!,
-    measurementId: configValues.measurementId, // Optional
-};
-
 let app: FirebaseApp;
 if (!getApps().length) {
   try {
-    app = initializeApp(firebaseConfig);
+    // Use the directly constructed firebaseConfig object
+    app = initializeApp(firebaseConfig as any); // Cast as any if type complains about potentially undefined measurementId
     console.log('[FirebaseSetup] Firebase app initialized successfully.');
   } catch (e: any) {
     console.error("[FirebaseSetup] CRITICAL_ERROR: Failed to initialize Firebase app with the provided config:", e.message);
@@ -127,4 +101,3 @@ export function convertDatesToTimestamps(data: any): any {
 
 
 export { app, db, auth, serverTimestamp, Timestamp, type FieldValue };
-

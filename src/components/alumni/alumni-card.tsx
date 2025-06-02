@@ -30,8 +30,7 @@ interface AlumniCardProps {
 
 export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: AlumniCardProps) {
   const { toast } = useToast();
-  const [message, setMessage] = React.useState("");
-  const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
+  // message and isRequestDialogOpen state are no longer needed here as the button is removed
   const [isProfileDialogOpen, setIsProfileDialogOpen] = React.useState(false);
 
   if (alumni.role !== 'alumni' || !alumni.alumniProfile) {
@@ -41,15 +40,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
   const { name, email, avatarUrl, alumniProfile } = alumni;
   const initial = name ? name.charAt(0).toUpperCase() : (email ? email.charAt(0).toUpperCase() : "A");
 
-  const handleRequestSubmit = () => {
-    if (!message.trim()) {
-      toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
-      return;
-    }
-    onMentorshipRequest(message); 
-    setIsRequestDialogOpen(false);
-    setMessage(""); 
-  };
+  // handleRequestSubmit is no longer needed here
 
   return (
     <Card className="flex flex-col h-full shadow-md hover:shadow-xl transition-shadow duration-300">
@@ -106,7 +97,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
             <ViewProfile 
               profile={alumni} 
               currentUserProfile={currentUserProfile} 
-              onMentorshipRequest={onMentorshipRequest}
+              onMentorshipRequest={onMentorshipRequest} // This prop is still passed to ViewProfile
             />
             <DialogFooter>
                 <DialogClose asChild>
@@ -115,38 +106,7 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {currentUserProfile?.role === 'student' && (
-          <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:flex-1">
-                <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Request Mentorship from {name}</DialogTitle>
-                <DialogDescription>
-                  Send a personalized message to {name} explaining why you&apos;d like their mentorship.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <Textarea
-                  placeholder="Hi, I'm interested in your expertise in..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="button" onClick={handleRequestSubmit}>Send Request</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* The "Request Mentorship" button and its Dialog has been removed from here */}
       </CardFooter>
     </Card>
   );

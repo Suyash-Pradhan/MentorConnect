@@ -92,10 +92,10 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
           </div>
         )}
       </CardContent>
-      <CardFooter className="p-4 border-t flex flex-col sm:flex-row gap-2">
+      <CardFooter className="p-4 border-t flex flex-col sm:flex-row sm:flex-wrap gap-2">
         <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto"> {/* Removed flex-1 */}
+            <Button variant="outline" className="w-full sm:w-auto">
               <Icons.profile className="mr-2 h-4 w-4" /> View Full Profile
             </Button>
           </DialogTrigger>
@@ -103,7 +103,6 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
             <DialogHeader>
               <DialogTitle className="text-2xl">{alumni.name}'s Profile</DialogTitle>
             </DialogHeader>
-            {/* Pass currentUserProfile and onMentorshipRequest to ViewProfile */}
             <ViewProfile 
               profile={alumni} 
               currentUserProfile={currentUserProfile} 
@@ -117,11 +116,10 @@ export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: 
           </DialogContent>
         </Dialog>
 
-        {/* Mentorship request button directly on the card, if student is viewing */}
         {currentUserProfile?.role === 'student' && (
           <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto"> {/* Removed flex-1 */}
+              <Button className="w-full sm:w-auto">
                 <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
               </Button>
             </DialogTrigger>

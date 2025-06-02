@@ -78,12 +78,13 @@ export default function ProfilePage() {
       return;
     }
     
-    const baseProfile = userProfile || {
+    const baseProfile: Profile = userProfile || {
         id: firebaseUser.uid,
         email: firebaseUser.email || "email.not.found@example.com",
         role: null,
         name: firebaseUser.displayName || "",
         avatarUrl: firebaseUser.photoURL || "",
+        bannerUrl: "", // Ensure bannerUrl is part of the initial structure if userProfile is null
         createdAt: new Date(), 
     };
 
@@ -105,8 +106,11 @@ export default function ProfilePage() {
       ...baseProfile, 
       id: firebaseUser.uid, 
       email: firebaseUser.email || baseProfile.email!, 
-      name: data.name || baseProfile.name,
-      avatarUrl: data.avatarUrl || baseProfile.avatarUrl,
+      
+      name: typeof data.name === 'string' ? data.name : baseProfile.name,
+      avatarUrl: typeof data.avatarUrl === 'string' ? data.avatarUrl : baseProfile.avatarUrl,
+      bannerUrl: typeof data.bannerUrl === 'string' ? data.bannerUrl : baseProfile.bannerUrl,
+      
       role: roleToSave,
       studentProfile: roleToSave === 'student' ? {
         college: data.college || baseProfile.studentProfile?.college || '',
@@ -174,12 +178,13 @@ export default function ProfilePage() {
     );
   }
   
-  const profileForViewOrForm = userProfile || {
+  const profileForViewOrForm: Profile = userProfile || {
     id: auth.currentUser?.uid || "temp-id", 
     email: auth.currentUser?.email || "",
     role: null,
     name: "",
     avatarUrl: "",
+    bannerUrl: "", // Ensure bannerUrl is initialized for new profile structure
     createdAt: new Date(), 
   };
   
@@ -187,6 +192,7 @@ export default function ProfilePage() {
   const profileForEditForm: Profile = {
       ...profileForViewOrForm,
       role: effectiveRoleForFormFields, 
+      bannerUrl: profileForViewOrForm.bannerUrl || "", // Ensure bannerUrl is part of this structure
       studentProfile: effectiveRoleForFormFields === 'student' 
           ? (profileForViewOrForm.studentProfile || { college: '', year: 1, academicInterests: [], goals: '' }) 
           : undefined,
@@ -243,8 +249,6 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
-      {/* For viewing own profile, pass userProfile as both profile and currentUserProfile */}
-      {/* No onMentorshipRequest needed here as you can't request mentorship from yourself */}
       {userProfile ? (
         <ViewProfile 
           profile={userProfile} 
@@ -258,3 +262,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    

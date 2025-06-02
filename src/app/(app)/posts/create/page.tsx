@@ -26,7 +26,7 @@ const postFormSchema = z.object({
   category: z.string().min(2, "Category is required.").max(50),
   tags: z.string().transform(val => val.split(',').map(s => s.trim()).filter(Boolean)),
   imageUrl: z.string().url("Invalid URL format for image.").optional().or(z.literal("")),
-  videoUrl: z.string().url("Invalid URL format for video.").optional().or(z.literal("")), // Stays as URL input for now
+  videoUrl: z.string().url("Invalid URL format for video.").optional().or(z.literal("")),
   externalLinkUrl: z.string().url("Invalid URL format for external link.").optional().or(z.literal("")),
   externalLinkText: z.string().max(100).optional(),
 });
@@ -57,8 +57,12 @@ export default function CreatePostPage() {
   });
 
   React.useEffect(() => {
-    setImagePreview(form.getValues("imageUrl") || null);
-  }, [form.watch("imageUrl")]);
+    // This effect updates the preview if imageUrl is set programmatically (e.g., after upload)
+    const currentImageUrl = form.getValues("imageUrl");
+    if (currentImageUrl && currentImageUrl !== imagePreview) {
+      setImagePreview(currentImageUrl);
+    }
+  }, [form.watch("imageUrl"), imagePreview, form]);
 
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,6 +70,9 @@ export default function CreatePostPage() {
     if (!file) return;
 
     setIsUploadingImage(true);
+    setImagePreview(null); // Clear previous preview
+    form.setValue("imageUrl", "", { shouldValidate: true }); // Clear previous URL
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -73,7 +80,7 @@ export default function CreatePostPage() {
       const result = await uploadImageAction(formData);
       if (result.url) {
         form.setValue("imageUrl", result.url, { shouldValidate: true });
-        setImagePreview(result.url);
+        setImagePreview(result.url); // Set new preview
         toast({ title: "Image Uploaded", description: "Post image has been uploaded." });
       } else if (result.error) {
         toast({ variant: "destructive", title: "Upload Failed", description: result.error });
@@ -101,7 +108,7 @@ export default function CreatePostPage() {
         title: values.title,
         content: values.content,
         category: values.category,
-        tags: values.tags as string[],
+        tags: values.tags as string[], // Zod transform ensures this is string[]
         imageUrl: values.imageUrl || undefined,
         videoUrl: values.videoUrl || undefined,
         externalLinkUrl: values.externalLinkUrl || undefined,
@@ -220,14 +227,14 @@ export default function CreatePostPage() {
               <FormItem>
                 <FormLabel>Post Image (Optional)</FormLabel>
                 {imagePreview && (
-                  <div className="my-2">
+                  <div className="my-2 relative w-full max-w-md aspect-video"> {/* Added aspect ratio container */}
                     <Image 
                       src={imagePreview} 
                       alt="Post image preview" 
-                      width={200} 
-                      height={120} 
-                      className="rounded-md object-cover border"
-                      data-ai-hint="image preview"
+                      layout="fill" // Changed to fill
+                      objectFit="contain" // Changed to contain for better preview
+                      className="rounded-md border"
+                      data-ai-hint="post image"
                     />
                   </div>
                 )}
@@ -243,6 +250,7 @@ export default function CreatePostPage() {
                 </FormControl>
                 {isUploadingImage && <p className="text-sm text-muted-foreground flex items-center"><Icons.spinner className="mr-2 h-4 w-4 animate-spin"/>Uploading image...</p>}
                 <FormDescription>Upload an image for your post (max 5MB, JPG/PNG/GIF/WebP).</FormDescription>
+                {/* Hidden input to store the imageUrl from Cloudinary */}
                  <FormField
                     control={form.control}
                     name="imageUrl"
@@ -258,7 +266,7 @@ export default function CreatePostPage() {
                   <FormItem>
                     <FormLabel>Video URL (Optional)</FormLabel>
                     <FormControl><Input placeholder="https://youtube.com/watch?v=your_video_id" {...field} disabled={isSubmitting || isUploadingImage} /></FormControl>
-                    <FormDescription>Link to a video (e.g., YouTube, Vimeo). Direct video upload can be added later.</FormDescription>
+                    <FormDescription>Link to a video (e.g., YouTube, Vimeo).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -301,3 +309,5 @@ export default function CreatePostPage() {
     </div>
   );
 }
+
+    

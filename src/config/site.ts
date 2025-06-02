@@ -97,10 +97,11 @@ export const siteConfig: SiteConfig = {
       roles: ['student', 'alumni'],
     },
      {
-      title: 'Help &amp; Support', // Ensured correct spelling
+      title: 'Help & Support', // Corrected from Help &amp; Support
       href: '/help',
       icon: LifeBuoy,
       roles: ['student', 'alumni'],
     },
   ],
 };
+

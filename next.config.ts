@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
       config.resolve.fallback['node:fs'] = false;
       config.resolve.fallback.tls = false;
       config.resolve.fallback.net = false;
+      config.resolve.fallback['node:net'] = false;
       config.resolve.fallback.http2 = false;
       config.resolve.fallback.dns = false;
       config.resolve.fallback.child_process = false;
@@ -87,6 +88,11 @@ const nextConfig: NextConfig = {
         config.plugins.push(
           new webpack.IgnorePlugin({
             resourceRegExp: /^node:http$/,
+          })
+        );
+        config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^node:net$/,
           })
         );
       }

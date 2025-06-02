@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation"; // For navigation
 import { getOrCreateChat } from "@/services/chatService"; // Import chat service
 import { updateMentorshipRequestStatus } from "@/services/mentorshipService"; // For updating chatId
+import { doc, updateDoc } from 'firebase/firestore'; // Added import for doc and updateDoc
+import { db } from '@/lib/firebase'; // Added import for db
 
 interface MentorshipRequestCardProps {
   request: MentorshipRequest;
@@ -64,19 +66,19 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
         // When accepting, create/get chat session and store chatId on mentorship request
         const chatId = await getOrCreateChat(request.studentId, request.alumniId);
         // Update the mentorship request with this chatId (optional, but good for linking)
-        await updateMentorshipRequestStatus(request.id, 'accepted', `Chat session created: ${chatId}`); // Use 'accepted' status
+        await updateMentorshipRequestStatus(request.id, 'accepted', chatId); // Pass chatId as the third argument
         // Call parent's update status for UI refresh
-        onUpdateRequestStatus(request.id, 'accepted');
+        onUpdateRequestStatus(request.id, 'accepted'); // Keep this to update UI
         toast({title: "Request Accepted", description: "Navigating to chat..."});
         router.push(`/chat/${chatId}`);
       } catch (error) {
         console.error("Error creating or getting chat session:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not initiate chat. Please try again." });
-        onUpdateRequestStatus(request.id, 'pending'); // Revert UI if needed or just show error
+        // Do not revert status here, as updateMentorshipRequestStatus might have partially succeeded or failed for other reasons
       } finally {
         setIsProcessingChat(false);
       }
-    } else { // For 'rejected' or other statuses that don't immediately go to chat
+    } else { // For 'rejected'
       onUpdateRequestStatus(request.id, status);
     }
   };
@@ -86,7 +88,7 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
     try {
       const chatIdToOpen = request.chatId || await getOrCreateChat(request.studentId, request.alumniId);
       if (!request.chatId && chatIdToOpen) {
-        // If chatId wasn't on the request, update it (optional, good for future direct links)
+        // If chatId wasn't on the request, update it
          await updateDoc(doc(db, 'mentorshipRequests', request.id), { chatId: chatIdToOpen });
       }
       router.push(`/chat/${chatIdToOpen}`);
@@ -217,3 +219,4 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
 //   const requestDocRef = doc(db, 'mentorshipRequests', requestId);
 //   await updateDoc(requestDocRef, data);
 // }
+

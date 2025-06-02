@@ -8,21 +8,25 @@ import { ArrowRight, Briefcase, MessageSquareHeart, UserPlus, Users, BookOpenTex
 import Link from "next/link";
 import Image from "next/image";
 import type { Profile, Post, MentorshipRequest } from "@/types";
-import { getProfile, getProfilesByRole } from "@/services/profileService";
+// getProfile removed, auth removed
 import { getAllPosts, getPostsByAuthor } from "@/services/postService";
-import { getMentorshipRequestsForUser } from "@/services/mentorshipService";
+import { getMentorshipRequestsForUser, getProfilesByRole } from "@/services/mentorshipService"; // getProfilesByRole moved here if only used here, or keep in profileService
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
-import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { useUserProfile } from "@/contexts/user-profile-context"; // Import context hook
+import { Icons } from "@/components/icons"; // For warning icon
+
+// If getProfilesByRole is primarily for alumni directory/AI rec, maybe it should be in profileService
+// For now, assuming it might be used by mentorshipService as well or is a general profile utility.
+// If it's purely a profile service, import { getProfilesByRole } from "@/services/profileService";
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = React.useState(true); // For dashboard's specific profile loading
-  
+  const { userProfile, profileLoading, profileError, refetchUserProfile } = useUserProfile(); // Use context
+
   const [recommendedAlumni, setRecommendedAlumni] = React.useState<Profile[]>([]); 
   const [isLoadingRecommendations, setIsLoadingRecommendations] = React.useState(false);
   const [recentPosts, setRecentPosts] = React.useState<Post[]>([]);
@@ -40,52 +44,28 @@ export default function DashboardPage() {
   };
 
   React.useEffect(() => {
-    // AppLayout ensures auth.currentUser is populated and valid before this page renders.
-    const firebaseUser = auth.currentUser; 
-    if (!firebaseUser) {
-      // This should ideally not be reached if AppLayout is correctly guarding routes.
-      // As a fallback, AppLayout will handle redirect to login.
-      // console.warn("[DashboardPage] No Firebase user found, AppLayout should have redirected.");
-      setIsLoadingProfile(false); // Stop loading if no user
-      return;
-    }
-
-    const fetchDashboardProfile = async () => {
-      setIsLoadingProfile(true);
-      try {
-        const profile = await getProfile(firebaseUser.uid);
-        if (profile) {
-          setCurrentUser(profile);
-          // Redirection logic based on profile completeness
-          if (!profile.role) {
-            router.push('/role-selection');
-          } else if (!profile.name || profile.name.trim() === "") {
-            router.push('/profile?edit=true&from=dashboard_name_missing');
-          }
-        } else {
-          // Profile document doesn't exist in Firestore for an authenticated user.
-          // This could happen if profile creation failed during signup or was deleted.
-          toast({ variant: "destructive", title: "Profile Incomplete", description: "Your profile is not fully set up." });
-          router.push('/role-selection'); 
-        }
-      } catch (error) {
-        console.error("[DashboardPage] Failed to fetch profile:", error);
-        toast({ variant: "destructive", title: "Profile Load Error", description: "Could not load your profile for the dashboard." });
-        // Do NOT redirect to /login here. AppLayout handles auth.
-        // If profile fetch fails for an authenticated user, AppLayout might show a global error,
-        // or this page can show a specific error message if currentUser remains null.
-        setCurrentUser(null); // Indicate profile error for dashboard rendering
-      } finally {
-        setIsLoadingProfile(false);
+    // Profile data and loading/error state comes from context.
+    // Redirect if profile is incomplete.
+    if (!profileLoading && userProfile) {
+      if (!userProfile.role) {
+        router.push('/role-selection');
+      } else if (!userProfile.name || userProfile.name.trim() === "") {
+        router.push('/profile?edit=true&from=dashboard_name_missing');
       }
-    };
-    fetchDashboardProfile();
-  }, [router, toast]);
+    } else if (!profileLoading && !userProfile && !profileError) {
+      // This case means profile doesn't exist for an authenticated user.
+      // AppLayout should handle initial auth, this page handles Firestore profile existence.
+      toast({ variant: "destructive", title: "Profile Incomplete", description: "Your profile is not fully set up." });
+      router.push('/role-selection');
+    }
+  }, [userProfile, profileLoading, profileError, router, toast]);
+
 
   React.useEffect(() => {
-    if (!currentUser || !currentUser.role) return; // Data fetching depends on currentUser profile and role
+    // Data fetching specific to dashboard, depends on userProfile from context
+    if (!userProfile || !userProfile.role || profileLoading) return; 
 
-    if (currentUser.role === 'student') {
+    if (userProfile.role === 'student') {
       const fetchStudentData = async () => {
         setIsLoadingRecentPosts(true);
         setIsLoadingRecommendations(true);
@@ -99,8 +79,9 @@ export default function DashboardPage() {
           setIsLoadingRecentPosts(false);
         }
 
-        if (currentUser.studentProfile) {
+        if (userProfile.studentProfile) {
           try {
+            // Using getProfilesByRole from profileService is more appropriate
             const alumniForAI = await getProfilesByRole('alumni', { limit: 50 }); 
              if (alumniForAI.length === 0) {
               setRecommendedAlumni([]);
@@ -113,9 +94,9 @@ export default function DashboardPage() {
               .join('; ');
 
             const aiInput: SmartAlumniRecommendationsInput = {
-              studentInterests: currentUser.studentProfile.academicInterests.join(', ') || 'General',
-              studentGoals: currentUser.studentProfile.goals || 'General career development',
-              studentAcademicInfo: `College: ${currentUser.studentProfile.college}, Year: ${currentUser.studentProfile.year}`,
+              studentInterests: userProfile.studentProfile.academicInterests.join(', ') || 'General',
+              studentGoals: userProfile.studentProfile.goals || 'General career development',
+              studentAcademicInfo: `College: ${userProfile.studentProfile.college}, Year: ${userProfile.studentProfile.year}`,
               alumniProfiles: alumniProfilesString,
             };
             
@@ -141,20 +122,21 @@ export default function DashboardPage() {
 
       const fetchStudentMentorshipStats = async () => {
          try {
-           const requests = await getMentorshipRequestsForUser(currentUser.id, 'student');
+           const requests = await getMentorshipRequestsForUser(userProfile.id, 'student');
            studentDashboardStats.pendingRequests = requests.filter(req => req.status === 'pending').length;
+           // Force re-render if needed by updating a state, though this is a direct object mutation
          } catch (error) {
             console.error("Failed to fetch student mentorship stats:", error);
          }
       };
       fetchStudentMentorshipStats();
 
-    } else if (currentUser.role === 'alumni') {
+    } else if (userProfile.role === 'alumni') {
       const fetchAlumniData = async () => {
         setIsLoadingMyPosts(true);
         setIsLoadingMentorshipStats(true);
         try {
-          const posts = await getPostsByAuthor(currentUser.id); 
+          const posts = await getPostsByAuthor(userProfile.id); 
           setMyRecentPosts(posts.slice(0, 3)); 
         } catch (error) {
           console.error("Failed to fetch my posts:", error);
@@ -164,7 +146,7 @@ export default function DashboardPage() {
         }
 
         try {
-          const requests = await getMentorshipRequestsForUser(currentUser.id, 'alumni');
+          const requests = await getMentorshipRequestsForUser(userProfile.id, 'alumni');
           const pendingCount = requests.filter(req => req.status === 'pending').length;
           const acceptedCount = requests.filter(req => req.status === 'accepted').length;
           setNewMentorshipRequestsCount(pendingCount);
@@ -178,30 +160,41 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [currentUser, toast]);
+  }, [userProfile, profileLoading, toast]); // Depend on userProfile from context
 
-  if (isLoadingProfile) { 
+  if (profileLoading) { 
     return <DashboardSkeleton />;
   }
 
-  if (!currentUser) {
-    // This state can be reached if profile fetching failed inside DashboardPage
-    // AppLayout would show its own error if Firestore access failed globally (e.g. permission denied)
+  if (profileError) { // Error handled by AppLayout's context provider, but can show specific message here
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
             <Icons.warning className="h-16 w-16 text-destructive mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Error Loading Dashboard</h2>
             <p className="text-muted-foreground text-center mb-4">
-                We couldn&apos;t load your dashboard information. Please try again later.
+                We couldn&apos;t load your dashboard due to a profile error. AppLayout might show more details.
             </p>
-            <Button onClick={() => router.push('/login')}>Return to Login</Button>
+             <Button onClick={() => router.push('/login')}>Return to Login</Button>
+        </div>
+    );
+  }
+  
+  if (!userProfile) { // Should be covered by redirection logic, but as a fallback
+     return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
+            <Icons.warning className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Profile Not Loaded</h2>
+            <p className="text-muted-foreground text-center mb-4">
+                Your profile could not be loaded. You might need to complete your registration.
+            </p>
+            <Button onClick={() => router.push('/role-selection')}>Setup Profile</Button>
         </div>
     );
   }
 
 
-  const userName = currentUser.name || "User";
-  const userRole = currentUser.role;
+  const userName = userProfile.name || "User";
+  const userRole = userProfile.role;
 
   return (
     <div className="space-y-6 w-full">

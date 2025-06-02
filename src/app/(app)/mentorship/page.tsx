@@ -4,51 +4,54 @@
 import * as React from "react";
 import { MentorshipRequestCard } from "@/components/mentorship/mentorship-request-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { MentorshipRequest, Role, Profile } from "@/types";
+import type { MentorshipRequest, Role } from "@/types"; // Profile type removed as it comes from context
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"; 
-import { Button } from "@/components/ui/button"; // Added missing import
-import Link from "next/link"; // Added missing import
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { getMentorshipRequestsForUser, updateMentorshipRequestStatus } from "@/services/mentorshipService";
-import { getProfile } from "@/services/profileService";
-
-// MOCK: In a real app, this would come from your auth context (e.g., Firebase Auth)
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+// getProfile removed, auth removed
+import { useUserProfile } from "@/contexts/user-profile-context"; // Import the context hook
 
 export default function MentorshipPage() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(true);
+  const { userProfile, profileLoading, profileError } = useUserProfile(); // Use context
+
   const [requests, setRequests] = React.useState<MentorshipRequest[]>([]);
-  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
+  const [isLoadingRequests, setIsLoadingRequests] = React.useState(true); // Specific loading for requests
 
   React.useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
+    if (profileLoading) return; // Wait for profile to be loaded or failed
+
+    if (!userProfile || !userProfile.role) {
+      // If profile is loaded but no role, this implies an issue handled by profile page or role selection.
+      // Mentorship page shouldn't function without a role.
+      setIsLoadingRequests(false);
+      setRequests([]); // Clear requests if profile/role is missing
+      // The UI will show the "role not set" message based on userProfile.role below
+      return;
+    }
+
+    const fetchMentorshipData = async () => {
+      setIsLoadingRequests(true);
       try {
-        const userProfile = await getProfile(MOCK_CURRENT_USER_ID);
-        setCurrentUserProfile(userProfile);
-        if (userProfile && userProfile.role) {
-          const fetchedRequests = await getMentorshipRequestsForUser(userProfile.id, userProfile.role);
-          setRequests(fetchedRequests);
-        } else {
-          // Handle case where profile or role is not found/set
-          setRequests([]);
-          if (!userProfile?.role) {
-             toast({ variant: "destructive", title: "Role not set", description: "Please set your role in your profile." });
-          }
-        }
+        // userProfile and userProfile.role are guaranteed here by the checks above
+        const fetchedRequests = await getMentorshipRequestsForUser(userProfile.id, userProfile.role);
+        setRequests(fetchedRequests);
       } catch (error) {
         console.error("Error fetching mentorship data:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load mentorship requests." });
+        setRequests([]);
       } finally {
-        setIsLoading(false);
+        setIsLoadingRequests(false);
       }
     };
-    fetchInitialData();
-  }, [toast]);
+
+    fetchMentorshipData();
+  }, [userProfile, profileLoading, toast]); // Depend on userProfile and profileLoading from context
 
   const handleUpdateRequestStatus = async (requestId: string, newStatus: 'accepted' | 'rejected' | 'messaged', message?: string) => {
     try {
@@ -66,26 +69,26 @@ export default function MentorshipPage() {
   };
 
   const categorizeRequests = (role: Role | null) => {
-    if (!role || !currentUserProfile) return { sent: [], received: [], accepted: [] };
+    if (!role || !userProfile) return { sent: [], received: [], accepted: [] };
     if (role === 'student') {
       return {
-        sent: requests.filter(req => req.studentId === currentUserProfile.id),
-        received: [], // Students don't receive requests in this model
-        accepted: [], // Students see accepted status on their sent requests
+        sent: requests.filter(req => req.studentId === userProfile.id),
+        received: [],
+        accepted: [], 
       };
     } else { // alumni
       return {
-        received: requests.filter(req => req.alumniId === currentUserProfile.id && req.status === 'pending'),
-        accepted: requests.filter(req => req.alumniId === currentUserProfile.id && req.status === 'accepted'),
-        sent: [], // Alumni don't send requests in this model
+        received: requests.filter(req => req.alumniId === userProfile.id && req.status === 'pending'),
+        accepted: requests.filter(req => req.alumniId === userProfile.id && req.status === 'accepted'),
+        sent: [],
       };
     }
   };
   
-  const categorized = categorizeRequests(currentUserProfile?.role || null);
+  const categorized = categorizeRequests(userProfile?.role || null);
   
   const renderRequestList = (reqList: MentorshipRequest[], emptyMessage: string) => {
-    if (isLoading) {
+    if (isLoadingRequests) { // Use specific loading state for requests
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
           {Array.from({length: 2}).map((_, i) => <RequestCardSkeleton key={i} />)}
@@ -106,7 +109,7 @@ export default function MentorshipPage() {
           <MentorshipRequestCard
             key={request.id}
             request={request}
-            currentUserRole={currentUserProfile?.role || 'student'} // Default to student if role is null to prevent errors, though UI might be odd.
+            currentUserRole={userProfile?.role || 'student'}
             onUpdateRequestStatus={handleUpdateRequestStatus}
           />
         ))}
@@ -114,7 +117,7 @@ export default function MentorshipPage() {
     );
   };
 
-  if (isLoading && !currentUserProfile) {
+  if (profileLoading) { // Show skeleton if profile is loading (from context)
      return (
       <div className="w-full">
         <Skeleton className="h-10 w-3/4 mb-2" />
@@ -123,12 +126,22 @@ export default function MentorshipPage() {
           {Array.from({length: 2}).map((_, i) => <RequestCardSkeleton key={i} />)}
         </div>
       </div>
-     )
+     );
   }
 
-  if (!currentUserProfile?.role) {
+  if (profileError) { // Handle profile loading error from context
     return (
-      <div className="w-full text-center">
+      <div className="w-full text-center py-10">
+        <Icons.warning className="h-16 w-16 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-destructive">Error Loading Profile</h2>
+        <p className="text-muted-foreground">Could not load your profile information for the mentorship page.</p>
+      </div>
+    );
+  }
+
+  if (!userProfile?.role) { // Role not set (profile loaded but no role)
+    return (
+      <div className="w-full text-center py-10">
         <Icons.warning className="mx-auto h-16 w-16 text-destructive mb-4" />
         <p className="text-lg text-muted-foreground">Your role is not set. Please update your profile.</p>
         <Button asChild className="mt-4"><Link href="/profile">Go to Profile</Link></Button>
@@ -136,24 +149,24 @@ export default function MentorshipPage() {
     );
   }
 
-
+  // At this point, userProfile and userProfile.role are available.
   return (
     <div className="w-full">
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-foreground">Mentorship Dashboard</h1>
         <p className="text-lg text-muted-foreground">
-          {currentUserProfile?.role === 'student'
+          {userProfile.role === 'student'
             ? "Manage your mentorship requests sent to alumni."
             : "Manage mentorship requests received from students."}
         </p>
       </div>
 
-      {currentUserProfile?.role === 'student' && (
+      {userProfile.role === 'student' && (
         <Tabs defaultValue="sent" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:w-1/2 lg:w-1/3">
             <TabsTrigger value="sent">
                 Sent Requests 
-                {!isLoading && categorized.sent && <Badge variant="secondary" className="ml-2">{categorized.sent.length}</Badge>}
+                {!isLoadingRequests && categorized.sent && <Badge variant="secondary" className="ml-2">{categorized.sent.length}</Badge>}
             </TabsTrigger>
              <TabsTrigger value="active" disabled>Active Mentorships</TabsTrigger>
           </TabsList>
@@ -166,16 +179,16 @@ export default function MentorshipPage() {
         </Tabs>
       )}
 
-      {currentUserProfile?.role === 'alumni' && (
+      {userProfile.role === 'alumni' && (
         <Tabs defaultValue="received" className="w-full">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:w-1/2 lg:w-1/3">
             <TabsTrigger value="received">
                 Received Requests
-                {!isLoading && categorized.received && <Badge variant="secondary" className="ml-2">{categorized.received.length}</Badge>}
+                {!isLoadingRequests && categorized.received && <Badge variant="secondary" className="ml-2">{categorized.received.length}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="accepted">
                 Accepted Requests
-                {!isLoading && categorized.accepted && <Badge variant="secondary" className="ml-2">{categorized.accepted.length}</Badge>}
+                {!isLoadingRequests && categorized.accepted && <Badge variant="secondary" className="ml-2">{categorized.accepted.length}</Badge>}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="received">

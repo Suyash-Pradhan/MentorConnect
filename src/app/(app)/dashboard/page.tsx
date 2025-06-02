@@ -10,7 +10,8 @@ import Image from "next/image";
 import type { Profile, Post, MentorshipRequest } from "@/types";
 // getProfile removed, auth removed
 import { getAllPosts, getPostsByAuthor } from "@/services/postService";
-import { getMentorshipRequestsForUser, getProfilesByRole } from "@/services/mentorshipService"; // getProfilesByRole moved here if only used here, or keep in profileService
+import { getMentorshipRequestsForUser } from "@/services/mentorshipService"; 
+import { getProfilesByRole } from "@/services/profileService"; // Corrected import for getProfilesByRole
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSmartAlumniRecommendations, type SmartAlumniRecommendationsInput } from "@/ai/flows/smart-alumni-recommendations";
@@ -375,3 +376,4 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
+

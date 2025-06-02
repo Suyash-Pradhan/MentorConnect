@@ -196,7 +196,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
     } catch (error: any) {
       let gMessage = "Could not sign in with Google. Please try again.";
-      console.error("Google Sign-In detailed error:", error); // Log the full error object
+      console.error("Google Sign-In detailed error:", error); 
 
       if (error.code) {
         switch (error.code) {
@@ -204,8 +204,10 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             gMessage = "Google Sign-In cancelled by user.";
             break;
           case 'auth/operation-not-allowed':
+            gMessage = "Google Sign-In is not configured correctly for this app. Please check Firebase console (Authentication providers).";
+            break;
           case 'auth/unauthorized-domain':
-            gMessage = "Google Sign-In is not configured correctly for this app. Please check Firebase console (Authentication providers & Authorized Domains).";
+            gMessage = `This domain is not authorized for Google Sign-In. Please add it to your Firebase project's authorized domains list (Authentication > Sign-in method > Authorized domains). Your current domain is: ${window.location.hostname}. For local development, add 'localhost'. For cloud environments, add the specific URL or a wildcard (e.g., *.cloudworkstations.dev).`;
             break;
           case 'auth/cancelled-popup-request':
           case 'auth/popup-blocked':
@@ -225,7 +227,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             gMessage = `An unexpected error occurred with Google Sign-In: ${error.message || error.code || 'Unknown error'}`;
         }
       }
-      toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage, duration: 7000 });
+      toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage, duration: 10000 });
     } finally {
       setIsGoogleLoading(false);
     }

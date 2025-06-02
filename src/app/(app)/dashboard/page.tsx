@@ -42,25 +42,34 @@ export default function DashboardPage() {
   };
 
   React.useEffect(() => {
-    if (profileLoading) return; 
+    if (profileLoading) return; // Wait for profile context to settle
 
-    if (userProfile) { 
+    if (!userProfile && !profileError) {
+        // This means profile context is settled, userProfile is null, and there was no error fetching.
+        // This implies the user is likely new or their profile document doesn't exist in Firestore.
+        const firebaseUser = auth.currentUser;
+        if (firebaseUser) {
+            // Authenticated but no profile document in Firestore
+            router.push('/role-selection');
+        } else {
+            // This case should ideally be handled by AppLayout (redirect to /login if no firebaseUser)
+            // but as a fallback:
+            router.push('/login');
+        }
+        return; // Stop further processing in this effect
+    }
+
+    if (userProfile) {
       if (!userProfile.role) { 
+        // Profile exists, but role is null/empty
         router.push('/role-selection');
       } else if (!userProfile.name || userProfile.name.trim() === "") { 
+        // Profile exists, role exists, but name is missing
         router.push('/profile?edit=true&from=dashboard_name_missing');
       }
-    } else if (!profileError) { 
-      // If no profile and no error, user might be new or auth state changed.
-      // Let onAuthStateChanged in AppLayout handle redirect to login if firebaseUser becomes null.
-      // If firebaseUser exists but profile is null (and no error), role-selection is appropriate.
-      const firebaseUser = auth.currentUser;
-      if (firebaseUser) {
-          router.push('/role-selection');
-      } else {
-          router.push('/login'); // Should be caught by AppLayout, but as a fallback.
-      }
+      // If profile, role, and name exist, stay on dashboard.
     }
+    // If profileError is present, the main return of the component handles error display.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile, profileLoading, profileError, router]);
 
@@ -185,7 +194,7 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [userProfile, profileLoading, toast]); // Removed toast from here as it was causing re-runs; toast is stable.
+  }, [userProfile, profileLoading, toast]); 
 
   if (profileLoading) { 
     return <DashboardSkeleton />;
@@ -206,17 +215,15 @@ export default function DashboardPage() {
   }
   
   if (!userProfile) { 
+    // This case should be handled by the useEffect redirecting to /role-selection or /login.
+    // If it reaches here, it's an unexpected state, show a generic message.
      return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
-            <Icons.warning className="h-16 w-16 text-destructive mb-4" />
+            <Icons.warning className="h-16 w-16 text-amber-500 mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Profile Not Loaded</h2>
             <p className="text-muted-foreground text-center mb-4">
-                Your profile could not be loaded. You might need to complete your registration or log in again.
+                Your profile could not be loaded. You might be redirected shortly.
             </p>
-            <div className="flex gap-2">
-                <Button onClick={() => router.push('/role-selection')}>Setup Profile</Button>
-                <Button variant="outline" onClick={() => router.push('/login')}>Login</Button>
-            </div>
         </div>
     );
   }
@@ -226,14 +233,14 @@ export default function DashboardPage() {
   const userRole = userProfile.role;
 
   if (!userRole) {
+    // This case should also be handled by useEffect redirecting to /role-selection.
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
             <Icons.warning className="h-16 w-16 text-amber-500 mb-4" />
             <h2 className="text-2xl font-semibold mb-2">Role Not Set</h2>
             <p className="text-muted-foreground text-center mb-4">
-                Your role is not yet set in your profile. Please complete role selection.
+                Your role is not yet set. You should be redirected to select your role.
             </p>
-            <Button onClick={() => router.push('/role-selection')}>Select Role</Button>
         </div>
     );
   }

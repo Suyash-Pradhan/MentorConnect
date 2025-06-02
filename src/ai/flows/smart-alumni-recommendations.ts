@@ -65,8 +65,24 @@ const smartAlumniRecommendationsFlow = ai.defineFlow(
     inputSchema: SmartAlumniRecommendationsInputSchema,
     outputSchema: SmartAlumniRecommendationsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input): Promise<SmartAlumniRecommendationsOutput> => {
+    try {
+      const response = await prompt(input);
+      const output = response.output;
+
+      if (!output || typeof output.recommendedAlumni !== 'string') {
+        console.error('SmartAlumniRecommendationsFlow: LLM did not return valid output or recommendedAlumni string.', { responseDetails: response });
+        // Return a default value that matches SmartAlumniRecommendationsOutputSchema
+        // This prevents a crash if the LLM fails to produce structured output
+        return { recommendedAlumni: "" };
+      }
+      return output;
+    } catch (e: any) {
+      console.error("Error executing smartAlumniRecommendationsPrompt in flow:", e);
+      // Return a default or error-indicating output that matches the schema
+      // This helps the client side identify there was an issue.
+      return { recommendedAlumni: "Error: Could not fetch recommendations from AI." };
+    }
   }
 );
+

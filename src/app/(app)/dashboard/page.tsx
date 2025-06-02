@@ -8,7 +8,6 @@ import { ArrowRight, Briefcase, MessageSquareHeart, UserPlus, Users, BookOpenTex
 import Link from "next/link";
 import Image from "next/image";
 import type { Profile, Post, MentorshipRequest } from "@/types";
-// getProfile removed, auth removed
 import { getAllPosts, getPostsByAuthor } from "@/services/postService";
 import { getMentorshipRequestsForUser } from "@/services/mentorshipService"; 
 import { getProfilesByRole } from "@/services/profileService";
@@ -43,18 +42,15 @@ export default function DashboardPage() {
   };
 
   React.useEffect(() => {
-    if (profileLoading) return; // Wait for context to finish loading profile
+    if (profileLoading) return; 
 
-    if (userProfile) { // Profile exists
-      if (!userProfile.role) { // Role is missing
+    if (userProfile) { 
+      if (!userProfile.role) { 
         router.push('/role-selection');
-      } else if (!userProfile.name || userProfile.name.trim() === "") { // Name is missing (role exists)
+      } else if (!userProfile.name || userProfile.name.trim() === "") { 
         router.push('/profile?edit=true&from=dashboard_name_missing');
       }
-    } else if (!profileError) { // Profile does not exist (and not due to error)
-      // This implies a new Firebase user whose Firestore profile doc hasn't been created yet.
-      // AppLayout has confirmed Firebase auth, but Firestore profile is missing.
-      // Redirect to role selection for new profile creation flow.
+    } else if (!profileError) { 
       router.push('/role-selection');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +58,6 @@ export default function DashboardPage() {
 
 
   React.useEffect(() => {
-    // Data fetching specific to dashboard, depends on userProfile from context
     if (!userProfile || !userProfile.role || profileLoading) return; 
 
     if (userProfile.role === 'student') {
@@ -100,21 +95,41 @@ export default function DashboardPage() {
             };
             
             const recommendationsOutput = await getSmartAlumniRecommendations(aiInput);
-            const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
-            
-            const filteredRecommendedAlumni = alumniForAI.filter(alumni => 
-              alumni.name && recommendedNames.includes(alumni.name.toLowerCase())
-            );
-            setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); 
 
-          } catch (error) {
+            if (recommendationsOutput.recommendedAlumni.startsWith("Error:")) {
+                console.error("AI Recommendation Flow Error:", recommendationsOutput.recommendedAlumni);
+                toast({ variant: "destructive", title: "AI Error", description: recommendationsOutput.recommendedAlumni });
+                setRecommendedAlumni([]);
+            } else if (recommendationsOutput.recommendedAlumni === "") {
+                 setRecommendedAlumni([]); // No recommendations returned by AI
+            } else {
+                const recommendedNames = recommendationsOutput.recommendedAlumni.split(',').map(name => name.trim().toLowerCase());
+                const filteredRecommendedAlumni = alumniForAI.filter(alumni => 
+                alumni.name && recommendedNames.includes(alumni.name.toLowerCase())
+                );
+                setRecommendedAlumni(filteredRecommendedAlumni.slice(0,3)); 
+            }
+
+          } catch (error: any) {
             console.error("Failed to fetch smart alumni recommendations:", error);
-            toast({ variant: "destructive", title: "AI Error", description: "Could not load alumni recommendations." });
+            let description = "Could not load alumni recommendations due to an unexpected issue.";
+            if (error.message) {
+                 if (error.message.toLowerCase().includes('api key') || error.message.toLowerCase().includes('auth')) {
+                    description = "AI recommendations failed. There might be an issue with the AI service configuration (e.g., API key). Please check server logs.";
+                } else if (error.message.toLowerCase().includes('quota')) {
+                    description = "AI recommendations failed due to API quota limits.";
+                } else {
+                    description = `AI recommendations failed: ${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''}`;
+                }
+            }
+            toast({ variant: "destructive", title: "AI Recommendation Error", description });
+            setRecommendedAlumni([]);
           } finally {
             setIsLoadingRecommendations(false);
           }
         } else {
              setIsLoadingRecommendations(false);
+             setRecommendedAlumni([]);
         }
       };
       fetchStudentData();
@@ -123,7 +138,6 @@ export default function DashboardPage() {
          try {
            const requests = await getMentorshipRequestsForUser(userProfile.id, 'student');
            studentDashboardStats.pendingRequests = requests.filter(req => req.status === 'pending').length;
-           // Force re-render if needed by updating a state, though this is a direct object mutation
          } catch (error) {
             console.error("Failed to fetch student mentorship stats:", error);
          }
@@ -159,7 +173,7 @@ export default function DashboardPage() {
       };
       fetchAlumniData();
     }
-  }, [userProfile, profileLoading, toast]); 
+  }, [userProfile, profileLoading]); 
 
   if (profileLoading) { 
     return <DashboardSkeleton />;
@@ -196,9 +210,6 @@ export default function DashboardPage() {
   const userName = userProfile.name || "User";
   const userRole = userProfile.role;
 
-  // If role is still null/undefined here, something is wrong with the flow before Dashboard
-  // For example, role selection didn't save or context didn't update.
-  // The useEffect above should have redirected. This is a fallback display.
   if (!userRole) {
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
@@ -283,7 +294,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No specific recommendations at this time. Explore the Alumni Directory!</p>
+                <p className="text-muted-foreground">No specific recommendations at this time or recommendations could not be loaded. Explore the Alumni Directory!</p>
               )}
             </div>
             <div>
@@ -392,3 +403,4 @@ const PostListSkeleton = () => (
     ))}
   </ul>
 );
+

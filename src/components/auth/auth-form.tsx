@@ -137,7 +137,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
             break;
           default:
              if (error.code !== 'auth/popup-closed-by-user') {
-                 console.error("Authentication error:", error);
+                 console.error("Email/Password Auth error:", error);
              }
             errorMessage = error.message || errorMessage;
         }
@@ -148,6 +148,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
         variant: "destructive",
         title: isSignUp ? "Sign Up Failed" : "Login Failed",
         description: errorMessage,
+        duration: 7000,
       });
     } finally {
       setIsLoading(false);
@@ -174,7 +175,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
       } else {
         console.error("Password reset error:", error);
       }
-      toast({ variant: "destructive", title: "Error", description: Fmessage });
+      toast({ variant: "destructive", title: "Error", description: Fmessage, duration: 7000 });
     } finally {
       setIsResetLoading(false);
     }
@@ -186,8 +187,7 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
       await setPersistence(auth, browserLocalPersistence);
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      // On successful Firebase Google login, redirect to dashboard.
-      // DashboardPage and AppLayout will handle fetching/creating profile and further redirection if needed.
+      
       toast({
         title: "Signed in with Google!",
         description: "Redirecting to your dashboard...",
@@ -196,18 +196,36 @@ export function AuthForm({ isSignUp = false }: AuthFormProps) {
 
     } catch (error: any) {
       let gMessage = "Could not sign in with Google. Please try again.";
-      if (error.code === 'auth/popup-closed-by-user') {
-        gMessage = "Google Sign-In cancelled.";
-      } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/unauthorized-domain') {
-        gMessage = "Google Sign-In is not enabled for this app. Please contact support or check Firebase console setup.";
-        console.error("Google Sign-In error:", error);
-      } else if (error.code === 'auth/invalid-api-key') {
-        gMessage = "Firebase API Key is invalid for Google Sign-In. Please check your app configuration.";
-        console.error("Google Sign-In error: Firebase API Key is invalid.", error);
-      } else {
-        console.error("Google Sign-In error:", error);
+      console.error("Google Sign-In detailed error:", error); // Log the full error object
+
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/popup-closed-by-user':
+            gMessage = "Google Sign-In cancelled by user.";
+            break;
+          case 'auth/operation-not-allowed':
+          case 'auth/unauthorized-domain':
+            gMessage = "Google Sign-In is not configured correctly for this app. Please check Firebase console (Authentication providers & Authorized Domains).";
+            break;
+          case 'auth/cancelled-popup-request':
+          case 'auth/popup-blocked':
+          case 'auth/popup-blocked-by-browser':
+            gMessage = "Google Sign-In popup was blocked or cancelled. Please disable popup blockers for this site and try again.";
+            break;
+          case 'auth/invalid-credential':
+             gMessage = "Invalid credential for Google Sign-In. Check Firebase project setup and API key configurations.";
+             break;
+          case 'auth/account-exists-with-different-credential':
+            gMessage = "An account already exists with the same email address but different sign-in credentials. Sign in using a provider associated with this email address.";
+            break;
+          case 'auth/invalid-api-key':
+            gMessage = "Firebase API Key is invalid for Google Sign-In. Please check your app configuration and ensure it's correctly set up in Google Cloud Console and .env.local.";
+            break;
+          default:
+            gMessage = `An unexpected error occurred with Google Sign-In: ${error.message || error.code || 'Unknown error'}`;
+        }
       }
-      toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage });
+      toast({ variant: "destructive", title: "Google Sign-In Failed", description: gMessage, duration: 7000 });
     } finally {
       setIsGoogleLoading(false);
     }

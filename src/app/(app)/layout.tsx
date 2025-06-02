@@ -2,7 +2,7 @@
 "use client"; 
 
 import type { ReactNode } from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { useRouter, usePathname } from 'next/navigation';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -112,9 +112,9 @@ const FirestoreErrorDisplay = ({ error }: { error: any }) => {
 
 function ChatNotificationsManager({ userId }: { userId: string }) {
   const { addNotification } = useNotifications();
-  const lastNotificationCheckTimeRef = React.useRef<Timestamp>(Timestamp.now());
+  const lastNotificationCheckTimeRef = useRef<Timestamp>(Timestamp.now()); // Changed to useRef
 
-  React.useEffect(() => {
+  useEffect(() => { // Changed to useEffect
     if (!userId) return;
 
     // This timestamp helps ignore messages that existed before the listener was set up or were already processed.

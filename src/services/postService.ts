@@ -267,3 +267,19 @@ export async function getCommentsForPost(postId: string): Promise<PostComment[]>
     throw error;
   }
 }
+
+export async function getDistinctPostCategories(): Promise<string[]> {
+  try {
+    const posts = await getAllPosts(); 
+    const categoriesSet = new Set<string>();
+    posts.forEach(post => {
+      if (post.category) {
+        categoriesSet.add(post.category);
+      }
+    });
+    return Array.from(categoriesSet).sort();
+  } catch (error) {
+    console.error("Error fetching distinct post categories:", error);
+    return [];
+  }
+}

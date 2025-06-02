@@ -3,6 +3,7 @@
 
 /**
  * @fileOverview An AI chatbot for answering student FAQs about the Alumni-Student Interaction Platform.
+ * It can use tools to fetch live data summaries to provide better guidance.
  *
  * - answerFAQ - A function that answers student FAQs.
  * - AnswerFAQInput - The input type for the answerFAQ function.
@@ -11,6 +12,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { getDistinctAlumniIndustries } from '@/services/profileService';
+import { getDistinctPostCategories } from '@/services/postService';
+import { getDiscussionThreadTitles } from '@/services/discussionService';
 
 const AnswerFAQInputSchema = z.object({
   question: z.string().describe('The question from the student.'),
@@ -22,6 +26,55 @@ const AnswerFAQOutputSchema = z.object({
 });
 export type AnswerFAQOutput = z.infer<typeof AnswerFAQOutputSchema>;
 
+// Tool: Get Alumni Industries List
+const AlumniIndustriesOutputSchema = z.object({
+  industries: z.array(z.string()).describe("A list of distinct industries alumni are in.")
+});
+const getAlumniIndustriesListTool = ai.defineTool(
+  {
+    name: 'getAlumniIndustriesList',
+    description: 'Fetches a list of distinct industries represented by alumni on the platform. Use this if a user asks what kind of industries alumni are in, or about alumni expertise in general.',
+    outputSchema: AlumniIndustriesOutputSchema,
+  },
+  async () => {
+    const industries = await getDistinctAlumniIndustries();
+    return { industries };
+  }
+);
+
+// Tool: Get Post Categories List
+const PostCategoriesOutputSchema = z.object({
+  categories: z.array(z.string()).describe("A list of distinct categories for posts made by alumni.")
+});
+const getPostCategoriesListTool = ai.defineTool(
+  {
+    name: 'getPostCategoriesList',
+    description: 'Fetches a list of distinct categories for posts made by alumni. Use this if a user asks what kind of topics or opportunities alumni post about.',
+    outputSchema: PostCategoriesOutputSchema,
+  },
+  async () => {
+    const categories = await getDistinctPostCategories();
+    return { categories };
+  }
+);
+
+// Tool: Get Discussion Topics Summary
+const DiscussionTopicsOutputSchema = z.object({
+  recentTopics: z.array(z.string()).describe("A list of titles from recent discussion threads.")
+});
+const getDiscussionTopicsSummaryTool = ai.defineTool(
+  {
+    name: 'getDiscussionTopicsSummary',
+    description: 'Provides a few examples of recent discussion thread titles to give an idea of what topics are being discussed. Use this if a user asks what people are talking about in the discussions section.',
+    outputSchema: DiscussionTopicsOutputSchema,
+  },
+  async () => {
+    const titles = await getDiscussionThreadTitles({ limit: 5 });
+    return { recentTopics: titles };
+  }
+);
+
+
 export async function answerFAQ(input: AnswerFAQInput): Promise<AnswerFAQOutput> {
   return answerFAQFlow(input);
 }
@@ -30,6 +83,7 @@ const prompt = ai.definePrompt({
   name: 'answerFAQPrompt',
   input: {schema: AnswerFAQInputSchema},
   output: {schema: AnswerFAQOutputSchema},
+  tools: [getAlumniIndustriesListTool, getPostCategoriesListTool, getDiscussionTopicsSummaryTool],
   prompt: `You are "MentorBot", a friendly and knowledgeable AI assistant for the MentorConnect platform. MentorConnect is designed to bridge the gap between students and experienced alumni for mentorship, guidance, and career opportunities.
 
 Your main goal is to help users understand and effectively use the platform's features. These include:
@@ -43,13 +97,21 @@ Your main goal is to help users understand and effectively use the platform's fe
 - **AI Chatbot (You!):** You are here to answer questions about the platform.
 - **Help & Support Page:** A dedicated page with common FAQs and contact information.
 
-When a user asks a question, provide clear, concise, and helpful answers.
-- If the question is about how to perform an action on the platform (e.g., "How do I update my profile?"), explain the steps clearly.
-- If the question is about the platform's purpose or benefits (e.g., "How can an alumni help me?"), elaborate on that.
+To help you guide the user effectively, you have access to the following tools:
+- \`getAlumniIndustriesList\`: Call this tool if the user asks about the range of industries alumni are in or wants to know about general alumni expertise. You can then mention a few examples and direct them to the Alumni Directory.
+- \`getPostCategoriesList\`: Call this tool if the user asks about the types of content alumni post (e.g., types of jobs, guidance topics). You can list some example categories and point them to the Posts section.
+- \`getDiscussionTopicsSummary\`: Call this tool if the user asks what topics are discussed on the platform. You can provide a few recent discussion titles as examples and guide them to the Discussions page.
+
+When answering:
+- If the question is about how to perform an action (e.g., "How do I update my profile?"), explain the steps.
+- If the question is about general platform capabilities (e.g., "What can alumni do here?"), describe the relevant features.
+- If the question implies interest in specific content (e.g., "What kind of jobs are posted?" or "What industries are alumni from?" or "What are people talking about?"), consider using your tools to fetch relevant summaries. Then, incorporate this information into your answer and guide the user to the appropriate section of the platform (e.g., Posts page, Alumni Directory, Discussions page).
 - You can also offer tips on how to make the most of MentorConnect, such as advice on writing a good mentorship request, what information is useful in a profile for better matching, or how to engage in discussions effectively.
 - Be specific about which user role (student or alumni) can perform certain actions if relevant (e.g., only alumni can create posts).
 
 Remember, your primary function is to assist with platform-related queries. Politely decline to answer questions that are off-topic or unrelated to the MentorConnect platform and its use.
+If a tool returns empty data (e.g., no industries found), inform the user gracefully (e.g., "Currently, no specific industries are listed, but you can browse all alumni in the directory.").
+Do not invent information if the tools don't provide it. Instead, guide the user to where they might find it on the platform or suggest rephrasing.
 
 User's question: {{{question}}}`,
 });
@@ -71,10 +133,13 @@ const answerFAQFlow = ai.defineFlow(
     } catch (error: any) {
       console.error('Error executing answerFAQPrompt in flow:', error);
       let userMessage = "I'm currently having trouble connecting to the AI service. Please try again in a few moments.";
-      if (error.message && error.message.includes('Service Unavailable') || error.message.includes('overloaded')) {
+      if (error.message && (error.message.includes('Service Unavailable') || error.message.includes('overloaded'))) {
         userMessage = "The AI service is currently experiencing high demand. Please try your question again in a little while.";
       } else if (error.message && error.message.includes('API key not valid')) {
         userMessage = "There seems to be an issue with the AI service configuration. Please notify support.";
+      } else if (error.message) {
+        // For other errors, provide a more generic message but log the specific one
+        userMessage = `I encountered an issue while processing your request. You could try rephrasing or ask about something else. (Details: ${error.message.substring(0,100)})`;
       }
       return { answer: userMessage };
     }

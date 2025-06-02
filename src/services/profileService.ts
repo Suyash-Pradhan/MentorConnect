@@ -7,6 +7,7 @@
  * - setProfile - Creates or updates a user profile.
  * - initializeRoleProfile - Initializes a basic profile structure based on role.
  * - getProfilesByRole - Fetches all user profiles matching a specific role.
+ * - getDistinctAlumniIndustries - Fetches a list of unique industries from alumni profiles.
  */
 import { db } from '@/lib/firebase';
 import type { Profile, StudentProfile, AlumniProfile, Role } from '@/types';
@@ -143,5 +144,21 @@ export async function getProfilesByRole(role: Role, options?: { limit?: number }
   } catch (error) {
     console.error(`Error fetching profiles for role ${role}:`, error);
     throw error; // Re-throw to be handled by caller
+  }
+}
+
+export async function getDistinctAlumniIndustries(): Promise<string[]> {
+  try {
+    const alumniProfiles = await getProfilesByRole('alumni');
+    const industriesSet = new Set<string>();
+    alumniProfiles.forEach(profile => {
+      if (profile.alumniProfile?.industry) {
+        industriesSet.add(profile.alumniProfile.industry);
+      }
+    });
+    return Array.from(industriesSet).sort();
+  } catch (error) {
+    console.error("Error fetching distinct alumni industries:", error);
+    return []; 
   }
 }

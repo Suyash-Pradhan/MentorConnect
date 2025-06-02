@@ -179,3 +179,27 @@ export async function deleteDiscussionThread(threadId: string): Promise<void> {
     throw error;
   }
 }
+
+export async function getDiscussionThreadTitles(options?: { limit?: number }): Promise<string[]> {
+  try {
+    const threadsCollectionRef = collection(db, 'discussionThreads');
+    let q = query(threadsCollectionRef, orderBy('lastActivityAt', 'desc'));
+
+    if (options?.limit) {
+      q = query(q, firestoreLimit(options.limit));
+    }
+    
+    const querySnapshot = await getDocs(q);
+    const titles: string[] = [];
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Partial<DiscussionThread>; // Cast for title access
+      if (data.title) {
+        titles.push(data.title);
+      }
+    });
+    return titles;
+  } catch (error) {
+    console.error("Error fetching discussion thread titles:", error);
+    return []; // Return empty array on error for robust tool usage
+  }
+}

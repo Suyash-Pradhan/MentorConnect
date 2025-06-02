@@ -7,9 +7,25 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import React from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ViewProfileProps {
-  profile: Profile; 
+  profile: Profile;
+  currentUserProfile?: Profile | null; // To know who is viewing
+  onMentorshipRequest?: (message: string) => void; // Callback for mentorship request
 }
 
 const ProfileInfoItem: React.FC<{ icon: React.ElementType; label: string; value?: string | number | string[] | null; isLink?: boolean; linkPrefix?: string }> = ({ icon: Icon, label, value, isLink = false, linkPrefix = '' }) => {
@@ -47,8 +63,30 @@ const ProfileInfoItem: React.FC<{ icon: React.ElementType; label: string; value?
   );
 };
 
-export function ViewProfile({ profile }: ViewProfileProps) {
+export function ViewProfile({ profile, currentUserProfile, onMentorshipRequest }: ViewProfileProps) {
+  const { toast } = useToast();
+  const [message, setMessage] = React.useState("");
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
+  
   const initial = profile.name ? profile.name.charAt(0).toUpperCase() : (profile.email ? profile.email.charAt(0).toUpperCase() : "U");
+
+  const canRequestMentorship = 
+    profile.role === 'alumni' && 
+    currentUserProfile?.role === 'student' && 
+    profile.id !== currentUserProfile?.id &&
+    typeof onMentorshipRequest === 'function';
+
+  const handleRequestSubmit = () => {
+    if (!message.trim()) {
+      toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
+      return;
+    }
+    if (onMentorshipRequest) {
+      onMentorshipRequest(message);
+    }
+    setIsRequestDialogOpen(false);
+    setMessage(""); 
+  };
 
   return (
     <Card className="w-full shadow-lg overflow-hidden">
@@ -72,7 +110,7 @@ export function ViewProfile({ profile }: ViewProfileProps) {
       <CardHeader className="text-center mt-16 pt-8"> 
         <CardTitle className="text-3xl">{profile.name || "User Name"}</CardTitle>
         <CardDescription className="text-md text-muted-foreground">{profile.email}</CardDescription>
-        <Badge variant="outline" className="mx-auto mt-2 text-md capitalize">{profile.role}</Badge>
+        {profile.role && <Badge variant="outline" className="mx-auto mt-2 text-md capitalize">{profile.role}</Badge>}
       </CardHeader>
       
       <CardContent className="p-6 space-y-6">
@@ -103,10 +141,49 @@ export function ViewProfile({ profile }: ViewProfileProps) {
           </section>
         )}
 
-        {!profile.studentProfile && !profile.alumniProfile && profile.role && (
+        {(!profile.studentProfile && !profile.alumniProfile && profile.role) && (
           <p className="text-center text-muted-foreground py-4">
-            Please complete your profile information by clicking the &quot;Edit Profile&quot; button.
+            More details may be available. User might need to complete their profile.
           </p>
+        )}
+         {(!profile.role) && (
+            <p className="text-center text-muted-foreground py-4">
+                This user has not selected a role yet.
+            </p>
+        )}
+
+        {canRequestMentorship && (
+          <div className="mt-6 pt-6 border-t">
+            <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full">
+                  <Icons.send className="mr-2 h-4 w-4" /> Request Mentorship
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Request Mentorship from {profile.name}</DialogTitle>
+                  <DialogDescription>
+                    Send a personalized message to {profile.name} explaining why you&apos;d like their mentorship.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <Textarea
+                    placeholder="Hi, I'm interested in your expertise in..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button type="button" onClick={handleRequestSubmit}>Send Request</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </CardContent>
     </Card>

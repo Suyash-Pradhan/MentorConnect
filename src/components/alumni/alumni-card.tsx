@@ -24,11 +24,11 @@ import { ViewProfile } from "../profile/view-profile";
 
 interface AlumniCardProps {
   alumni: Profile; 
-  currentUserRole?: Role | null; // Added to control mentorship button
+  currentUserProfile?: Profile | null; // Changed from currentUserRole
   onMentorshipRequest: (message: string) => void; 
 }
 
-export function AlumniCard({ alumni, currentUserRole, onMentorshipRequest }: AlumniCardProps) {
+export function AlumniCard({ alumni, currentUserProfile, onMentorshipRequest }: AlumniCardProps) {
   const { toast } = useToast();
   const [message, setMessage] = React.useState("");
   const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
@@ -103,7 +103,12 @@ export function AlumniCard({ alumni, currentUserRole, onMentorshipRequest }: Alu
             <DialogHeader>
               <DialogTitle className="text-2xl">{alumni.name}'s Profile</DialogTitle>
             </DialogHeader>
-            <ViewProfile profile={alumni} />
+            {/* Pass currentUserProfile and onMentorshipRequest to ViewProfile */}
+            <ViewProfile 
+              profile={alumni} 
+              currentUserProfile={currentUserProfile} 
+              onMentorshipRequest={onMentorshipRequest}
+            />
             <DialogFooter>
                 <DialogClose asChild>
                     <Button type="button" variant="secondary">Close</Button>
@@ -112,7 +117,8 @@ export function AlumniCard({ alumni, currentUserRole, onMentorshipRequest }: Alu
           </DialogContent>
         </Dialog>
 
-        {currentUserRole === 'student' && (
+        {/* Mentorship request button directly on the card, if student is viewing */}
+        {currentUserProfile?.role === 'student' && (
           <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full sm:w-auto flex-1">

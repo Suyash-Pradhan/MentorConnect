@@ -10,38 +10,35 @@ import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button"; 
 import Link from "next/link"; 
-import { getProfilesByRole, getProfile } from "@/services/profileService";
+import { getProfilesByRole } from "@/services/profileService"; // getProfile was removed, not needed here directly
 import { createMentorshipRequest } from "@/services/mentorshipService";
-
-const MOCK_CURRENT_USER_ID = "user123_dev"; 
+import { useUserProfile } from "@/contexts/user-profile-context"; // Import context hook
 
 export default function AlumniDirectoryPage() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(true);
+  const { userProfile, profileLoading: isCurrentUserProfileLoading } = useUserProfile(); // Get current user from context
+
+  const [isLoadingAlumni, setIsLoadingAlumni] = React.useState(true);
   const [allAlumni, setAllAlumni] = React.useState<Profile[]>([]);
   const [filteredAlumni, setFilteredAlumni] = React.useState<Profile[]>([]);
-  const [currentUserProfile, setCurrentUserProfile] = React.useState<Profile | null>(null);
   
   React.useEffect(() => {
     const fetchPageData = async () => {
-      setIsLoading(true);
+      setIsLoadingAlumni(true);
       try {
-        const [alumniData, userProfile] = await Promise.all([
-          getProfilesByRole('alumni'),
-          getProfile(MOCK_CURRENT_USER_ID) 
-        ]);
+        // Fetch alumni data regardless of current user profile loading status first
+        const alumniData = await getProfilesByRole('alumni');
         setAllAlumni(alumniData);
         setFilteredAlumni(alumniData);
-        setCurrentUserProfile(userProfile);
       } catch (error) {
-        console.error("Failed to fetch alumni or user profile:", error);
+        console.error("Failed to fetch alumni:", error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not load page data. Please try again later.",
+          description: "Could not load alumni data. Please try again later.",
         });
       } finally {
-        setIsLoading(false);
+        setIsLoadingAlumni(false);
       }
     };
     fetchPageData();
@@ -74,7 +71,7 @@ export default function AlumniDirectoryPage() {
   }, [allAlumni]);
 
   const handleMentorshipRequest = async (alumni: Profile, message: string) => {
-    if (!currentUserProfile || currentUserProfile.role !== 'student') {
+    if (!userProfile || userProfile.role !== 'student') {
       toast({ variant: "destructive", title: "Error", description: "Only students can send mentorship requests." });
       return;
     }
@@ -84,10 +81,10 @@ export default function AlumniDirectoryPage() {
     }
 
     const requestData: Omit<MentorshipRequest, 'id' | 'requestedAt' | 'status'> = {
-      studentId: currentUserProfile.id,
-      studentName: currentUserProfile.name || "Student User",
-      studentAvatar: currentUserProfile.avatarUrl,
-      studentGoals: currentUserProfile.studentProfile?.goals,
+      studentId: userProfile.id,
+      studentName: userProfile.name || "Student User",
+      studentAvatar: userProfile.avatarUrl,
+      studentGoals: userProfile.studentProfile?.goals,
       alumniId: alumni.id,
       alumniName: alumni.name || "Alumni User",
       alumniAvatar: alumni.avatarUrl,
@@ -124,7 +121,7 @@ export default function AlumniDirectoryPage() {
     return Array.from(industriesSet).sort();
   }, [allAlumni]);
 
-  if (isLoading) { // Show skeleton if page data or user profile is loading
+  if (isLoadingAlumni || isCurrentUserProfileLoading) { 
      return (
         <div className="container mx-auto py-8 px-4 md:px-6">
             <div className="mb-8 text-center">
@@ -141,11 +138,8 @@ export default function AlumniDirectoryPage() {
      );
   }
   
-  // The page is now accessible to all authenticated users.
-  // Specific functionalities like "Request Mentorship" will be controlled at the AlumniCard component level.
-
   const alumniCount = filteredAlumni.length;
-  const subtitleText = currentUserProfile?.role === 'student' 
+  const subtitleText = userProfile?.role === 'student' 
     ? `Browse ${alumniCount} alumni. Connect for mentorship & view LinkedIn profiles.`
     : `Browse ${alumniCount} alumni. View profiles and LinkedIn details.`;
 
@@ -154,7 +148,7 @@ export default function AlumniDirectoryPage() {
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-foreground mb-2">Alumni Directory</h1>
         <p className="text-lg text-muted-foreground">
-          {isLoading ? 'Loading alumni...' : subtitleText}
+          {isLoadingAlumni ? 'Loading alumni...' : subtitleText}
         </p>
       </div>
 
@@ -170,7 +164,7 @@ export default function AlumniDirectoryPage() {
             <AlumniCard 
               key={alumni.id} 
               alumni={alumni} 
-              currentUserRole={currentUserProfile?.role} // Pass current user's role
+              currentUserProfile={userProfile} // Pass full current user profile
               onMentorshipRequest={(message) => handleMentorshipRequest(alumni, message)} 
             />
           ))}

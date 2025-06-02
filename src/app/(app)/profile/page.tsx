@@ -16,26 +16,25 @@ import {
 } from "@/components/ui/dialog";
 import { Icons } from "@/components/icons";
 import type { Profile } from "@/types";
-import { setProfile } from "@/services/profileService"; // getProfile removed
+import { setProfile } from "@/services/profileService"; 
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/firebase"; 
-import { useUserProfile } from "@/contexts/user-profile-context"; // Import context hook
+import { useUserProfile } from "@/contexts/user-profile-context"; 
 
 export default function ProfilePage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { userProfile, profileLoading, profileError, refetchUserProfile } = useUserProfile(); // Use context
+  const { userProfile, profileLoading, profileError, refetchUserProfile } = useUserProfile(); 
   
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  // For demo purposes if role is not set, allows toggling form view
   const [displayRoleForForm, setDisplayRoleForForm] = React.useState<'student' | 'alumni'>('student');
-  const [isSaving, setIsSaving] = React.useState(false); // Local loading state for save operation
+  const [isSaving, setIsSaving] = React.useState(false); 
 
 
   React.useEffect(() => {
-    if (profileLoading) return; // Wait for context to load profile
+    if (profileLoading) return; 
 
     if (userProfile) {
       if (userProfile.role) {
@@ -46,7 +45,7 @@ export default function ProfilePage() {
       const fromParam = searchParams.get('from');
 
       if ( (editParam === 'true' && fromParam === 'dashboard_name_missing' && !userProfile.name) ||
-           (editParam === 'true' && fromParam === 'role_selection') || // Always open edit after role selection
+           (editParam === 'true' && fromParam === 'role_selection') || 
            (editParam === 'true' && !fromParam && (!userProfile.name || !userProfile.role) )
          ) {
             setIsEditDialogOpen(true);
@@ -59,13 +58,12 @@ export default function ProfilePage() {
             } else if (!userProfile.role) { 
                 toast({ title: "Select Your Role", description: "Please select your role and complete your profile details."});
             }
-      } else if (editParam === 'true' && !fromParam) { // Generic edit request
+      } else if (editParam === 'true' && !fromParam) { 
          setIsEditDialogOpen(true);
       }
     } else if (!profileError) { 
-      // Profile is not loading, no error, but userProfile is null - means new user or profile doc missing
       const firebaseUser = auth.currentUser;
-      if (firebaseUser) { // Should always be true due to AppLayout
+      if (firebaseUser) { 
           setIsEditDialogOpen(true); 
           toast({ title: "Welcome!", description: "Please complete your profile by selecting a role and filling in your details." });
       }
@@ -80,15 +78,13 @@ export default function ProfilePage() {
       return;
     }
     
-    // Use userProfile from context as the base for the update
-    // Or create a default new profile structure if userProfile from context is null
     const baseProfile = userProfile || {
         id: firebaseUser.uid,
         email: firebaseUser.email || "email.not.found@example.com",
         role: null,
         name: firebaseUser.displayName || "",
         avatarUrl: firebaseUser.photoURL || "",
-        createdAt: new Date(), // This will be converted to serverTimestamp by setProfile if new
+        createdAt: new Date(), 
     };
 
     setIsSaving(true);
@@ -106,8 +102,8 @@ export default function ProfilePage() {
     }
 
     const updatedProfileData: Profile = {
-      ...baseProfile, // Spread base profile (either from context or new structure)
-      id: firebaseUser.uid, // Ensure ID is from firebaseUser
+      ...baseProfile, 
+      id: firebaseUser.uid, 
       email: firebaseUser.email || baseProfile.email!, 
       name: data.name || baseProfile.name,
       avatarUrl: data.avatarUrl || baseProfile.avatarUrl,
@@ -127,12 +123,12 @@ export default function ProfilePage() {
         industry: data.industry || baseProfile.alumniProfile?.industry || '',
         linkedinUrl: data.linkedinUrl || baseProfile.alumniProfile?.linkedinUrl || '',
       } : undefined, 
-      createdAt: baseProfile.createdAt, // Preserve original or new Date for setProfile to handle
+      createdAt: baseProfile.createdAt, 
     };
 
     try {
       await setProfile(firebaseUser.uid, updatedProfileData);
-      await refetchUserProfile(); // Refetch profile to update context
+      await refetchUserProfile(); 
       setIsEditDialogOpen(false);
       toast({ title: "Profile Saved", description: "Your profile has been updated." });
       
@@ -178,15 +174,13 @@ export default function ProfilePage() {
     );
   }
   
-  // Construct a profile object for the form, using context profile or a default new structure
-  // This ensures EditProfileForm always receives a valid Profile-like structure.
   const profileForViewOrForm = userProfile || {
-    id: auth.currentUser?.uid || "temp-id", // Should be available from AppLayout
+    id: auth.currentUser?.uid || "temp-id", 
     email: auth.currentUser?.email || "",
     role: null,
     name: "",
     avatarUrl: "",
-    createdAt: new Date(), // Placeholder, will be handled by setProfile
+    createdAt: new Date(), 
   };
   
   const effectiveRoleForFormFields = userProfile?.role || displayRoleForForm;
@@ -206,7 +200,7 @@ export default function ProfilePage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
         <div className="flex items-center gap-2">
-          {auth.currentUser && isEditDialogOpen && !userProfile?.role && ( // Show toggle only if role is not yet set in DB
+          {auth.currentUser && isEditDialogOpen && !userProfile?.role && ( 
             <>
               <span className="text-sm text-muted-foreground">Form View:</span>
               <Button variant="outline" size="sm" onClick={handleToggleDisplayRoleForForm} disabled={isSaving}>
@@ -249,11 +243,18 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
-      {userProfile ? <ViewProfile profile={userProfile} /> : 
+      {/* For viewing own profile, pass userProfile as both profile and currentUserProfile */}
+      {/* No onMentorshipRequest needed here as you can't request mentorship from yourself */}
+      {userProfile ? (
+        <ViewProfile 
+          profile={userProfile} 
+          currentUserProfile={userProfile} 
+        />
+      ) : (
         <p className="text-center text-muted-foreground py-4">
             {profileLoading ? "Loading profile..." : "Profile data is not available. Please complete your profile if prompted."}
         </p>
-      }
+      )}
     </div>
   );
 }

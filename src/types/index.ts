@@ -48,6 +48,7 @@ export interface MentorshipRequest {
   requestedAt: Date;
   respondedAt?: Date;
   alumniMessage?: string; // Optional field for alumni's direct message via the platform
+  chatId?: string; // To link to an active chat session
 }
 
 export interface Post {
@@ -94,7 +95,6 @@ export interface DiscussionThread {
   commentsCount: number; // To display comment count easily
 }
 
-// Original Comment type if used for DiscussionThread, ensure no name clash or merge logic
 export interface Comment { // This is for Discussion Threads
   id: string;
   threadId: string;
@@ -104,4 +104,28 @@ export interface Comment { // This is for Discussion Threads
   authorRole: Role;
   content: string;
   createdAt: Date;
+}
+
+// Chat specific types
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName?: string; // Denormalized for display
+  senderAvatar?: string; // Denormalized
+  text: string;
+  createdAt: Date;
+}
+
+export interface ChatSession {
+  id: string;
+  participantIds: string[]; // [studentId, alumniId] - keep consistent order for querying
+  studentId: string;
+  alumniId: string;
+  createdAt: Date;
+  lastMessageAt?: Date;
+  lastMessageText?: string;
+  // Optional: unread counts if implementing that feature
+  // studentUnreadCount?: number;
+  // alumniUnreadCount?: number;
 }

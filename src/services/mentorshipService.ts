@@ -51,7 +51,7 @@ function convertDatesToTimestamps(data: any): any {
   return newData;
 }
 
-export async function createMentorshipRequest(requestData: Omit<MentorshipRequest, 'id' | 'requestedAt' | 'status'>): Promise<string> {
+export async function createMentorshipRequest(requestData: Omit<MentorshipRequest, 'id' | 'requestedAt' | 'status' | 'chatId'>): Promise<string> {
   try {
     const dataToSet = {
       ...convertDatesToTimestamps(requestData),
@@ -80,7 +80,7 @@ export async function getMentorshipRequestsForUser(userId: string, userRole: Rol
     } else if (userRole === 'alumni') {
       q = query(requestsCollectionRef, where('alumniId', '==', userId), orderBy('requestedAt', 'desc'));
     } else {
-      return []; // Or handle admin role if necessary
+      return []; 
     }
     
     const querySnapshot = await getDocs(q);
@@ -98,7 +98,7 @@ export async function getMentorshipRequestsForUser(userId: string, userRole: Rol
 export async function updateMentorshipRequestStatus(
   requestId: string,
   status: MentorshipRequest['status'],
-  message?: string // Optional message, e.g., if 'messaged' status is used
+  messageOrChatId?: string 
 ): Promise<void> {
   if (!requestId) {
     console.error("updateMentorshipRequestStatus: requestId is required");
@@ -106,13 +106,26 @@ export async function updateMentorshipRequestStatus(
   }
   try {
     const requestDocRef = doc(db, 'mentorshipRequests', requestId);
-    const updateData: Partial<MentorshipRequest> & { respondedAt: FieldValue, alumniMessage?: string } = {
+    const updateData: Partial<MentorshipRequest> & { respondedAt?: FieldValue } = {
       status: status,
-      respondedAt: serverTimestamp() as FieldValue,
     };
-    if (message && status === 'messaged') { // Example: store message if status is 'messaged'
-        updateData.alumniMessage = message; // Assuming 'alumniMessage' is a field on MentorshipRequest
+
+    if (status !== 'pending') { // Add respondedAt unless reverting to pending
+        updateData.respondedAt = serverTimestamp() as FieldValue;
     }
+
+    if (status === 'messaged' && messageOrChatId) {
+        updateData.alumniMessage = messageOrChatId; 
+    } else if (status === 'accepted' && messageOrChatId) {
+        // If accepting and a chatId is provided (e.g. "Chat session created: <chatId>")
+        // we can parse it or just store the message. Or better, store chatId explicitly.
+        // For simplicity, we assume messageOrChatId is the actual chatId when status is accepted.
+        const existingRequest = await getDoc(requestDocRef);
+        if(existingRequest.exists() && existingRequest.data().chatId !== messageOrChatId) {
+             updateData.chatId = messageOrChatId; // Storing chatId on the request
+        }
+    }
+    
     await updateDoc(requestDocRef, updateData);
   } catch (error) {
     console.error("Error updating mentorship request status:", error);

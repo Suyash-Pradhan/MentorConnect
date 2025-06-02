@@ -23,16 +23,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import React from "react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog";
+import { useRouter } from "next/navigation"; // For navigation
+import { getOrCreateChat } from "@/services/chatService"; // Import chat service
+import { updateMentorshipRequestStatus } from "@/services/mentorshipService"; // For updating chatId
 
 interface MentorshipRequestCardProps {
   request: MentorshipRequest;
@@ -42,7 +35,7 @@ interface MentorshipRequestCardProps {
 
 const getStatusBadgeVariant = (status: MentorshipRequest['status']) => {
   switch (status) {
-    case 'accepted': return 'default'; // Changed to 'default' (primary) for accepted
+    case 'accepted': return 'default'; 
     case 'rejected': return 'destructive';
     case 'pending': return 'secondary';
     case 'messaged': return 'outline';
@@ -53,8 +46,10 @@ const getStatusBadgeVariant = (status: MentorshipRequest['status']) => {
 
 export function MentorshipRequestCard({ request, currentUserRole, onUpdateRequestStatus }: MentorshipRequestCardProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [replyMessage, setReplyMessage] = React.useState("");
   const [isReplyDialogOpen, setIsReplyDialogOpen] = React.useState(false);
+  const [isProcessingChat, setIsProcessingChat] = React.useState(false);
 
   const targetUser = currentUserRole === 'student' ?
     { name: request.alumniName, avatar: request.alumniAvatar, role: 'Alumni' as const, id: request.alumniId } :
@@ -62,43 +57,63 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
 
   const initial = targetUser.name ? targetUser.name.charAt(0).toUpperCase() : targetUser.role.charAt(0);
 
-  const handleAction = (status: 'accepted' | 'rejected') => {
-    onUpdateRequestStatus(request.id, status);
-    // Toast is now handled by the parent component for consistency
+  const handleAction = async (status: 'accepted' | 'rejected') => {
+    if (status === 'accepted') {
+      setIsProcessingChat(true);
+      try {
+        // When accepting, create/get chat session and store chatId on mentorship request
+        const chatId = await getOrCreateChat(request.studentId, request.alumniId);
+        // Update the mentorship request with this chatId (optional, but good for linking)
+        await updateMentorshipRequestStatus(request.id, 'accepted', `Chat session created: ${chatId}`); // Use 'accepted' status
+        // Call parent's update status for UI refresh
+        onUpdateRequestStatus(request.id, 'accepted');
+        toast({title: "Request Accepted", description: "Navigating to chat..."});
+        router.push(`/chat/${chatId}`);
+      } catch (error) {
+        console.error("Error creating or getting chat session:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not initiate chat. Please try again." });
+        onUpdateRequestStatus(request.id, 'pending'); // Revert UI if needed or just show error
+      } finally {
+        setIsProcessingChat(false);
+      }
+    } else { // For 'rejected' or other statuses that don't immediately go to chat
+      onUpdateRequestStatus(request.id, status);
+    }
   };
 
-  const handleSendMessage = () => {
+  const handleOpenChat = async () => {
+    setIsProcessingChat(true);
+    try {
+      const chatIdToOpen = request.chatId || await getOrCreateChat(request.studentId, request.alumniId);
+      if (!request.chatId && chatIdToOpen) {
+        // If chatId wasn't on the request, update it (optional, good for future direct links)
+         await updateDoc(doc(db, 'mentorshipRequests', request.id), { chatId: chatIdToOpen });
+      }
+      router.push(`/chat/${chatIdToOpen}`);
+    } catch (error) {
+      console.error("Error opening chat:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not open chat." });
+    } finally {
+      setIsProcessingChat(false);
+    }
+  };
+  
+  const handleSendMessageInDialog = () => {
     if (!replyMessage.trim()) {
       toast({ variant: "destructive", title: "Error", description: "Message cannot be empty." });
       return;
     }
     onUpdateRequestStatus(request.id, 'messaged', replyMessage);
-    // Toast is now handled by the parent component
     setIsReplyDialogOpen(false); 
     setReplyMessage(""); 
   };
 
+
   const getDialogTriggerButtonText = () => {
-    if (request.status === 'accepted') {
-      return currentUserRole === 'student' ? 'Open Chat with Alumni' : 'Open Chat with Student';
-    }
+    // This dialog is now only for 'messaged' status. 'Accepted' goes directly to chat page.
     return currentUserRole === 'student' ? 'Reply to Alumni' : 'Message Student';
   };
-
-  const getDialogTitle = () => {
-    if (request.status === 'accepted') {
-      return `Chat with ${targetUser.name}`;
-    }
-    return `Send a message to ${targetUser.name}`;
-  };
-
-  const getDialogDescription = () => {
-     if (request.status === 'accepted') {
-      return `This will open your chat conversation with ${targetUser.name}. (Chat UI Coming Soon!)`;
-    }
-    return `Continue the conversation regarding this mentorship.`;
-  }
-
+  
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-start gap-4 p-4 space-y-0">
@@ -145,20 +160,20 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
           </p>
         )}
       </CardContent>
+      
+      {/* Footer for Pending Requests (Alumni View) */}
       {currentUserRole === 'alumni' && request.status === 'pending' && (
         <CardFooter className="p-4 border-t flex justify-end gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isProcessingChat}>
                 <Icons.close className="mr-2 h-4 w-4" /> Reject
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure you want to reject this request?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone.
-                </AlertDialogDescription>
+                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -167,55 +182,38 @@ export function MentorshipRequestCard({ request, currentUserRole, onUpdateReques
             </AlertDialogContent>
           </AlertDialog>
 
-          <Button size="sm" onClick={() => handleAction('accepted')} className="bg-green-600 hover:bg-green-700 text-primary-foreground">
-            <Icons.check className="mr-2 h-4 w-4" /> Accept
+          <Button size="sm" onClick={() => handleAction('accepted')} className="bg-green-600 hover:bg-green-700 text-primary-foreground" disabled={isProcessingChat}>
+            {isProcessingChat ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin"/> : <Icons.check className="mr-2 h-4 w-4" />}
+            Accept & Chat
           </Button>
         </CardFooter>
       )}
-      { (request.status === 'accepted' || request.status === 'messaged') && (
+
+      {/* Footer for Accepted Requests (Both Views) */}
+      {request.status === 'accepted' && (
          <CardFooter className="p-4 border-t flex justify-end gap-2">
-            <Dialog open={isReplyDialogOpen} onOpenChange={setIsReplyDialogOpen}>
-              <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                      <Icons.send className="mr-2 h-4 w-4" />
-                      {getDialogTriggerButtonText()}
-                  </Button>
-              </DialogTrigger>
-              <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{getDialogTitle()}</DialogTitle>
-                    <DialogDescription>
-                        {getDialogDescription()}
-                    </DialogDescription>
-                  </DialogHeader>
-                  { request.status !== 'accepted' && ( // Only show textarea if not just "Open Chat" for an accepted request
-                    <Textarea
-                        placeholder="Type your message here..."
-                        value={replyMessage}
-                        onChange={(e) => setReplyMessage(e.target.value)}
-                        rows={4}
-                    />
-                  )}
-                  <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                      {request.status !== 'accepted' && (
-                        <Button type="button" onClick={handleSendMessage}>Send</Button>
-                      )}
-                      {request.status === 'accepted' && (
-                        <Button type="button" onClick={() => {
-                            toast({title: "Chat UI Coming Soon!", description: "This will open a dedicated chat window."});
-                            setIsReplyDialogOpen(false);
-                        }}>
-                            Proceed to Chat
-                        </Button>
-                      )}
-                  </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" size="sm" onClick={handleOpenChat} disabled={isProcessingChat}>
+                {isProcessingChat ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin"/> : <Icons.send className="mr-2 h-4 w-4" />}
+                Open Chat
+            </Button>
+         </CardFooter>
+      )}
+      
+      {/* Footer for Messaged Status (can continue messaging via dialog if not yet accepted) */}
+      {request.status === 'messaged' && (
+         <CardFooter className="p-4 border-t flex justify-end gap-2">
+            {/* Dialog for 'messaged' status to continue sending messages if not yet accepted */}
          </CardFooter>
       )}
     </Card>
   );
 }
 
-    
+// Add this to MentorshipService.ts if it's not there to update the doc
+// import { doc, updateDoc } from 'firebase/firestore';
+// import { db } from '@/lib/firebase';
+// ...
+// export async function updateMentorshipRequestDoc(requestId: string, data: Partial<MentorshipRequest>): Promise<void> {
+//   const requestDocRef = doc(db, 'mentorshipRequests', requestId);
+//   await updateDoc(requestDocRef, data);
+// }

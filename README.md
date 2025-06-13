@@ -1,7 +1,20 @@
+[![Built by Firebase Studio](https://img.shields.io/badge/Built%20by-Firebase%20Studio-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/products/studio)
 
-# ✨ MentorConnect - Alumni-Student Interaction Platform ✨
+<h1 align="center">✨ MentorConnect - Alumni-Student Interaction Platform ✨</h1>
 
-[![AI Built](https://img.shields.io/badge/Built%20by-AI%20Coding%20Partner-blueviolet)](https://firebase.google.com/products/studio)
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/ShadCN_UI-111111?logo=vercel&logoColor=white" alt="ShadCN UI" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black" alt="Firebase" />
+  <img src="https://img.shields.io/badge/Firestore-FFA000?logo=googlecloud&logoColor=white" alt="Firestore" />
+  <img src="https://img.shields.io/badge/Cloudinary-3448C5?logo=cloudinary&logoColor=white" alt="Cloudinary" />
+  <img src="https://img.shields.io/badge/Genkit-4285F4?logo=google&logoColor=white" alt="Genkit" />
+</p>
+
+
 
 **MentorConnect is a full-stack web application, primarily developed with the assistance of an AI coding partner in Firebase Studio.** It's designed to bridge the gap between students and experienced alumni, fostering mentorship, guidance, and career opportunities, initially tailored for the Technical Education Department, Govt. of Rajasthan.
 
